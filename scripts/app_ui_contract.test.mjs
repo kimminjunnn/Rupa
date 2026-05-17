@@ -16,6 +16,10 @@ const simulationInputSource = new URL(
   "../src/components/SimulationInputStage.tsx",
   import.meta.url,
 );
+const confirmModalSource = new URL(
+  "../src/components/ConfirmModal.tsx",
+  import.meta.url,
+);
 const routeHighlightOverlaySource = new URL(
   "../src/components/RouteHighlightOverlay.tsx",
   import.meta.url,
@@ -155,6 +159,15 @@ test("settings screen presents body fields as the primary work surface", async (
   assert.doesNotMatch(source, /styles\.heroCard/);
   assert.doesNotMatch(source, /BODY PROFILE/);
   assert.match(source, /styles\.introCopy/);
+});
+
+test("settings save modal uses a quieter confirm button tone", async () => {
+  const settings = await readFile(settingsSource, "utf8");
+  const modal = await readFile(confirmModalSource, "utf8");
+
+  assert.match(settings, /confirmTone="neutral"/);
+  assert.match(modal, /confirmTone = "danger"/);
+  assert.match(modal, /modalNeutralButton/);
 });
 
 test("simulation and settings tab surfaces avoid blue accent blocks", async () => {

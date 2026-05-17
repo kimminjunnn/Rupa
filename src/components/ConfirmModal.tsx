@@ -6,6 +6,7 @@ type ConfirmModalProps = {
   body: string;
   cancelLabel?: string;
   confirmLabel?: string;
+  confirmTone?: "danger" | "neutral";
   onCancel: () => void;
   onConfirm: () => void;
   title: string;
@@ -16,6 +17,7 @@ export function ConfirmModal({
   body,
   cancelLabel = "취소",
   confirmLabel = "확인",
+  confirmTone = "danger",
   onCancel,
   onConfirm,
   onRequestClose,
@@ -54,12 +56,19 @@ export function ConfirmModal({
 
             <Pressable
               onPress={onConfirm}
-              style={[styles.modalActionButton, styles.modalPrimaryButton]}
+              style={[
+                styles.modalActionButton,
+                confirmTone === "neutral"
+                  ? styles.modalNeutralButton
+                  : styles.modalPrimaryButton,
+              ]}
             >
               <Text
                 style={[
                   styles.modalActionText,
-                  styles.modalPrimaryButtonText,
+                  confirmTone === "neutral"
+                    ? styles.modalNeutralButtonText
+                    : styles.modalPrimaryButtonText,
                 ]}
               >
                 {confirmLabel}
@@ -134,6 +143,11 @@ const styles = StyleSheet.create({
   modalPrimaryButton: {
     backgroundColor: brand.colors.danger,
   },
+  modalNeutralButton: {
+    borderWidth: 1,
+    borderColor: "rgba(37, 29, 21, 0.14)",
+    backgroundColor: brand.colors.surfaceWarm,
+  },
   modalActionText: {
     fontSize: 15,
     fontWeight: "800",
@@ -143,5 +157,8 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButtonText: {
     color: brand.colors.primaryText,
+  },
+  modalNeutralButtonText: {
+    color: brand.colors.text,
   },
 });
