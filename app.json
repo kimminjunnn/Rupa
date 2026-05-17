@@ -14,27 +14,12 @@
       "backgroundColor": "#f7f0e6"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "infoPlist": {
-        "NSPhotoLibraryAddUsageDescription": "시뮬레이션에 사용할 사진을 관리하려면 사진 접근이 필요합니다.",
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        }
+        "NSPhotoLibraryAddUsageDescription": "시뮬레이션에 사용할 사진을 관리하려면 사진 접근이 필요합니다."
       },
       "bundleIdentifier": "com.balancinglife.rupa",
       "appleTeamId": "TVQSQG22UY"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/rupa-icon.png",
-        "backgroundColor": "#f7f0e6"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
     },
     "web": {
       "favicon": "./assets/rupa-icon.png"
@@ -49,6 +34,12 @@
           "photosPermission": "벽 사진을 불러와 시뮬레이션을 시작하려면 사진 접근이 필요합니다."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "821013f3-d88c-4813-a37f-40d9bd067157"
+      }
+    }
   }
 }
