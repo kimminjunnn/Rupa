@@ -19,7 +19,9 @@ export function SimulationInputStage({
 }: SimulationInputStageProps) {
   const router = useRouter();
   const { hasBodyProfile, profile } = useBodyProfileStore();
-  const profileLabel = hasBodyProfile ? "현재 신체 정보" : "신체 정보 입력 필요";
+  const profileLabel = hasBodyProfile
+    ? "현재 신체 정보"
+    : "신체 정보 입력 필요";
   const profileSummary = hasBodyProfile
     ? `${profile.height}cm / 리치 ${profile.wingspan}cm`
     : "시뮬레이션 정확도를 위해 먼저 입력해 주세요";
@@ -38,13 +40,17 @@ export function SimulationInputStage({
             <Text style={styles.heroEyebrow}>Rupa</Text>
             <Text style={styles.heroTitle}>새 시뮬레이션</Text>
             <Text style={styles.heroBody}>
-              벽 사진을 넣고 다음 움직임을 바로 맞춰보세요.
+              사진 위에서 당신의 무브를 시도해보세요
             </Text>
           </View>
 
           <Pressable onPress={onOpenCamera} style={styles.primaryCard}>
             <View style={styles.cameraIconBox}>
-              <Ionicons color={brand.colors.primaryText} name="camera" size={48} />
+              <Ionicons
+                color={brand.colors.primaryText}
+                name="camera"
+                size={48}
+              />
             </View>
 
             <Text style={styles.primaryTitle}>벽 사진 촬영하기</Text>
@@ -55,7 +61,11 @@ export function SimulationInputStage({
 
           <Pressable onPress={onOpenLibrary} style={styles.secondaryCard}>
             <View style={styles.secondaryIconBox}>
-              <Ionicons color={brand.colors.primaryText} name="images-outline" size={34} />
+              <Ionicons
+                color={brand.colors.primaryText}
+                name="images-outline"
+                size={34}
+              />
             </View>
 
             <View style={styles.secondaryCopy}>
@@ -63,7 +73,11 @@ export function SimulationInputStage({
               <Text style={styles.secondaryBody}>기존 사진으로 시뮬레이션</Text>
             </View>
 
-            <Ionicons color={brand.colors.text} name="chevron-forward" size={30} />
+            <Ionicons
+              color={brand.colors.text}
+              name="chevron-forward"
+              size={30}
+            />
           </Pressable>
 
           <Pressable

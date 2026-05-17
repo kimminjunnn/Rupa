@@ -23,7 +23,7 @@ export function HomeGlassCard() {
           <Text style={styles.eyebrow}>볼더링 시뮬레이터</Text>
           <Text style={styles.title}>막힌 구간을{"\n"}직접 풀어보세요</Text>
           <Text style={styles.description}>
-            벽 사진을 넣고 움직임을 바로 맞춰보세요.
+            사진 위에서 당신의 무브를 시도해보세요
           </Text>
         </View>
       </BlurView>
