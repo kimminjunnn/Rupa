@@ -90,6 +90,7 @@ type SkeletonPoseOverlayProps = {
   initialCenter?: Point2D;
   mode: "calibrating" | "simulating";
   onHistoryStateChange?: (state: SkeletonPoseOverlayHistoryState) => void;
+  onPoseChange?: (pose: SkeletonPose) => void;
   viewportHeight: number;
   viewportWidth: number;
 };
@@ -297,6 +298,7 @@ export const SkeletonPoseOverlay = forwardRef<
     initialCenter,
     mode,
     onHistoryStateChange,
+    onPoseChange,
     viewportHeight,
     viewportWidth,
   },
@@ -382,7 +384,8 @@ export const SkeletonPoseOverlay = forwardRef<
 
   useEffect(() => {
     poseRef.current = pose;
-  }, [pose]);
+    onPoseChange?.(pose);
+  }, [onPoseChange, pose]);
 
   useEffect(() => {
     onHistoryStateChange?.(historyState);

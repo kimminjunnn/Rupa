@@ -16,6 +16,10 @@ const simulationInputSource = new URL(
   "../src/components/SimulationInputStage.tsx",
   import.meta.url,
 );
+const routeHighlightOverlaySource = new URL(
+  "../src/components/RouteHighlightOverlay.tsx",
+  import.meta.url,
+);
 const homeGlassCardSource = new URL(
   "../src/components/HomeGlassCard.tsx",
   import.meta.url,
@@ -121,6 +125,28 @@ test("simulation canvas icon actions are accessible and large enough to tap", as
   assert.match(source, /accessibilityLabel="현재 벽 사진 삭제"/);
   assert.match(source, /width: 44/);
   assert.match(source, /height: 44/);
+});
+
+test("simulation canvas selects top hold after route hold adjustment", async () => {
+  const source = await readFile(simulationCanvasSource, "utf8");
+
+  assert.match(source, /setFlowStep\("routeEditing"\)/);
+  assert.match(source, /setFlowStep\("selectingTopHold"\)/);
+  assert.ok(
+    source.indexOf('setFlowStep("routeEditing")') <
+      source.indexOf('setFlowStep("selectingTopHold")'),
+  );
+});
+
+test("route overlay distinguishes start and top holds with borders only", async () => {
+  const source = await readFile(routeHighlightOverlaySource, "utf8");
+
+  assert.match(source, /startStrokeColor/);
+  assert.match(source, /topStrokeColor/);
+  assert.match(source, /const startStrokeColor = brand\.colors\.primary/);
+  assert.match(source, /stroke=\{selectedStrokeColor \?\? strokeColor\}/);
+  assert.doesNotMatch(source, /<Circle/);
+  assert.doesNotMatch(source, /strokeWidth=\{4\.4\}/);
 });
 
 test("settings screen presents body fields as the primary work surface", async () => {

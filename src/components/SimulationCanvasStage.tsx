@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -16,6 +16,7 @@ import {
   selectDetectedRoute,
 } from "../lib/routeDetectionApi";
 import { shouldLockRouteDetectionNavigation } from "../lib/routeDetectionUi";
+import { isSimulationClearComplete } from "../lib/simulationClearState";
 import {
   analysisPointToViewportPoint,
   viewportPointToAnalysisPoint,
@@ -33,6 +34,7 @@ import type {
   SimulationPhotoTransform,
   WallAnalysisResult,
 } from "../types/simulation";
+import type { SkeletonPose } from "../types/skeletonPose";
 import { BottomTabBar } from "./BottomTabBar";
 import { ConfirmModal } from "./ConfirmModal";
 import { brand } from "../theme/brand";
@@ -56,6 +58,7 @@ type CanvasFlowStep =
   | "analyzingHolds"
   | "selectingStartHold"
   | "selectingRoute"
+  | "selectingTopHold"
   | "routeEditing"
   | "sizingSkeleton"
   | "simulating";
@@ -77,9 +80,14 @@ export function SimulationCanvasStage({
   const [selectedStartHoldObjectId, setSelectedStartHoldObjectId] = useState<
     string | null
   >(null);
+  const [selectedTopHoldObjectId, setSelectedTopHoldObjectId] = useState<
+    string | null
+  >(null);
+  const [isClearComplete, setIsClearComplete] = useState(false);
   const [highlightError, setHighlightError] = useState<string | null>(null);
   const [flowStep, setFlowStep] = useState<CanvasFlowStep>("analyzingHolds");
   const [analysisAttempt, setAnalysisAttempt] = useState(0);
+  const [simulationAttempt, setSimulationAttempt] = useState(0);
   const simulationCueOpacity = useRef(new Animated.Value(0)).current;
   const simulationCueTranslateY = useRef(new Animated.Value(18)).current;
   const simulationCueScale = useRef(new Animated.Value(0.92)).current;
@@ -101,6 +109,8 @@ export function SimulationCanvasStage({
     setAnalysisResult(null);
     setRouteResult(null);
     setSelectedStartHoldObjectId(null);
+    setSelectedTopHoldObjectId(null);
+    setIsClearComplete(false);
     setHighlightError(null);
     setFlowStep("analyzingHolds");
 
@@ -174,21 +184,21 @@ export function SimulationCanvasStage({
           useNativeDriver: true,
         }),
       ]),
-      Animated.delay(760),
+      Animated.delay(isClearComplete ? 880 : 760),
       Animated.parallel([
         Animated.timing(simulationCueOpacity, {
-          duration: 520,
+          duration: isClearComplete ? 360 : 520,
           toValue: 0,
           useNativeDriver: true,
         }),
         Animated.timing(simulationCueTranslateY, {
-          duration: 520,
+          duration: isClearComplete ? 360 : 520,
           toValue: -18,
           useNativeDriver: true,
         }),
         Animated.timing(simulationCueScale, {
-          duration: 520,
-          toValue: 1.28,
+          duration: isClearComplete ? 360 : 520,
+          toValue: isClearComplete ? 1.38 : 1.28,
           useNativeDriver: true,
         }),
       ]),
@@ -200,6 +210,7 @@ export function SimulationCanvasStage({
     };
   }, [
     flowStep,
+    isClearComplete,
     simulationCueOpacity,
     simulationCueScale,
     simulationCueTranslateY,
@@ -278,7 +289,37 @@ export function SimulationCanvasStage({
     );
   }
 
-  async function handleCanvasPress(point: Point2D) {
+  function selectNearestRouteHold(
+    sourcePoint: Point2D,
+    objects: SimulationDetectedObject[],
+    route: RouteSelectionResult,
+  ) {
+    const routeHolds = objects.filter(
+      (object) =>
+        object.kind === "hold" && route.includedObjectIds.includes(object.id),
+    );
+
+    if (routeHolds.length === 0) {
+      return null;
+    }
+
+    const containingHold = routeHolds.find((object) =>
+      isPointInPolygon(sourcePoint, object.contour),
+    );
+
+    if (containingHold) {
+      return containingHold;
+    }
+
+    return routeHolds.reduce((closest, current) =>
+      getDistanceSquared(sourcePoint, current.center) <
+      getDistanceSquared(sourcePoint, closest.center)
+        ? current
+        : closest,
+    );
+  }
+
+  async function handleStartHoldPress(point: Point2D) {
     if (
       viewport.width <= 0 ||
       viewport.height <= 0 ||
@@ -307,6 +348,8 @@ export function SimulationCanvasStage({
     }
 
     setSelectedStartHoldObjectId(startHoldObject.id);
+    setSelectedTopHoldObjectId(null);
+    setIsClearComplete(false);
     setHighlightError(null);
     setRouteResult(null);
     setFlowStep("selectingRoute");
@@ -332,6 +375,58 @@ export function SimulationCanvasStage({
       setRouteResult(null);
       setHighlightError("루트 선택에 실패했어요. 다시 탭해보세요.");
       setFlowStep("selectingStartHold");
+    }
+  }
+
+  function handleTopHoldPress(point: Point2D) {
+    if (
+      viewport.width <= 0 ||
+      viewport.height <= 0 ||
+      flowStep !== "selectingTopHold" ||
+      !analysisResult ||
+      !routeResult
+    ) {
+      return;
+    }
+
+    const analysisTopHoldPoint = viewportPointToAnalysisPoint(
+      point,
+      photo,
+      analysisResult.image,
+      transform,
+      viewport.width,
+      viewport.height,
+    );
+    const topHoldObject = selectNearestRouteHold(
+      analysisTopHoldPoint,
+      analysisResult.objects,
+      routeResult,
+    );
+
+    if (!topHoldObject) {
+      setHighlightError("선택할 수 있는 탑 홀드를 찾지 못했어요.");
+      return;
+    }
+
+    if (topHoldObject.id === selectedStartHoldObjectId) {
+      setHighlightError("스타트와 다른 탑 홀드를 선택하세요.");
+      return;
+    }
+
+    setSelectedTopHoldObjectId(topHoldObject.id);
+    setIsClearComplete(false);
+    setHighlightError(null);
+    setFlowStep("sizingSkeleton");
+  }
+
+  async function handleCanvasPress(point: Point2D) {
+    if (flowStep === "selectingStartHold") {
+      await handleStartHoldPress(point);
+      return;
+    }
+
+    if (flowStep === "selectingTopHold") {
+      handleTopHoldPress(point);
     }
   }
 
@@ -362,6 +457,10 @@ export function SimulationCanvasStage({
       return;
     }
 
+    if (holdObject.id === selectedTopHoldObjectId) {
+      return;
+    }
+
     setRouteResult((currentRoute) => {
       if (!currentRoute) {
         return currentRoute;
@@ -381,8 +480,17 @@ export function SimulationCanvasStage({
   function handleReselectRoute() {
     setRouteResult(null);
     setSelectedStartHoldObjectId(null);
+    setSelectedTopHoldObjectId(null);
+    setIsClearComplete(false);
     setHighlightError(null);
     setFlowStep("selectingStartHold");
+  }
+
+  function handleReselectTopHold() {
+    setSelectedTopHoldObjectId(null);
+    setIsClearComplete(false);
+    setHighlightError(null);
+    setFlowStep("selectingTopHold");
   }
 
   function handleRetryAnalysis() {
@@ -393,8 +501,16 @@ export function SimulationCanvasStage({
     setAnalysisResult(null);
     setRouteResult(null);
     setSelectedStartHoldObjectId(null);
+    setSelectedTopHoldObjectId(null);
+    setIsClearComplete(false);
     setHighlightError(null);
     setFlowStep("sizingSkeleton");
+  }
+
+  function handleRetrySimulation() {
+    setIsClearComplete(false);
+    setFlowStep("simulating");
+    setSimulationAttempt((currentAttempt) => currentAttempt + 1);
   }
 
   const holdCount = analysisResult
@@ -415,6 +531,12 @@ export function SimulationCanvasStage({
           (object) => object.id === selectedStartHoldObjectId,
         )
       : null;
+  const selectedTopHoldObject =
+    analysisResult && selectedTopHoldObjectId
+      ? analysisResult.objects.find(
+          (object) => object.id === selectedTopHoldObjectId,
+        )
+      : null;
   const selectedStartHoldViewportCenter =
     analysisResult && selectedStartHoldObject
       ? analysisPointToViewportPoint(
@@ -426,6 +548,46 @@ export function SimulationCanvasStage({
           viewport.height,
         )
       : null;
+  const selectedTopHoldViewportCenter =
+    analysisResult && selectedTopHoldObject
+      ? analysisPointToViewportPoint(
+          selectedTopHoldObject.center,
+          analysisResult.image,
+          photo,
+          transform,
+          viewport.width,
+          viewport.height,
+        )
+      : null;
+  const selectedTopHoldViewportThreshold =
+    analysisResult && selectedTopHoldObject && selectedTopHoldViewportCenter
+      ? Math.min(
+          Math.max(
+            selectedTopHoldObject.contour.reduce((maxDistance, point) => {
+              const viewportPoint = analysisPointToViewportPoint(
+                point,
+                analysisResult.image,
+                photo,
+                transform,
+                viewport.width,
+                viewport.height,
+              );
+
+              return Math.max(
+                maxDistance,
+                Math.sqrt(
+                  getDistanceSquared(
+                    viewportPoint,
+                    selectedTopHoldViewportCenter,
+                  ),
+                ),
+              );
+            }, 0) + 16,
+            28,
+          ),
+          72,
+        )
+      : 0;
   const skeletonInitialCenter =
     selectedStartHoldViewportCenter && viewport.width > 0 && viewport.height > 0
       ? {
@@ -442,6 +604,30 @@ export function SimulationCanvasStage({
           ),
         }
       : undefined;
+  const handleSkeletonPoseChange = useCallback(
+    (pose: SkeletonPose) => {
+      if (flowStep !== "simulating" || isClearComplete) {
+        return;
+      }
+
+      if (
+        isSimulationClearComplete({
+          leftHand: pose.joints.leftHand,
+          rightHand: pose.joints.rightHand,
+          threshold: selectedTopHoldViewportThreshold,
+          topHoldCenter: selectedTopHoldViewportCenter,
+        })
+      ) {
+        setIsClearComplete(true);
+      }
+    },
+    [
+      flowStep,
+      isClearComplete,
+      selectedTopHoldViewportCenter,
+      selectedTopHoldViewportThreshold,
+    ],
+  );
   const isAnalyzingHolds = flowStep === "analyzingHolds";
   const isSelectingRoute = flowStep === "selectingRoute";
   const isRouteDetectionNavigationLocked =
@@ -474,6 +660,8 @@ export function SimulationCanvasStage({
         return "스타트 홀드를 탭하세요";
       case "selectingRoute":
         return "같은 색 루트를 찾는 중";
+      case "selectingTopHold":
+        return "탑 홀드를 탭하세요";
       case "routeEditing":
         return "루트 홀드를 확인하세요";
       case "sizingSkeleton":
@@ -508,6 +696,7 @@ export function SimulationCanvasStage({
               photo={photo}
               route={routeResult}
               selectedStartHoldObjectId={selectedStartHoldObjectId}
+              selectedTopHoldObjectId={selectedTopHoldObjectId}
               transform={transform}
               viewportHeight={viewport.height}
               viewportWidth={viewport.width}
@@ -527,6 +716,7 @@ export function SimulationCanvasStage({
           ) : null}
 
           {flowStep === "selectingStartHold" ||
+          flowStep === "selectingTopHold" ||
           flowStep === "selectingRoute" ||
           flowStep === "analyzingHolds" ? (
             <Pressable
@@ -630,6 +820,7 @@ export function SimulationCanvasStage({
           viewport.width > 0 &&
           viewport.height > 0 ? (
             <SkeletonPoseOverlay
+              key={simulationAttempt}
               ref={skeletonOverlayRef}
               allowEmptySpacePinchScale
               allowPinchScaleInSimulation
@@ -639,6 +830,7 @@ export function SimulationCanvasStage({
                 flowStep === "sizingSkeleton" ? "calibrating" : "simulating"
               }
               onHistoryStateChange={setSkeletonHistoryState}
+              onPoseChange={handleSkeletonPoseChange}
               viewportHeight={viewport.height}
               viewportWidth={viewport.width}
             />
@@ -659,7 +851,7 @@ export function SimulationCanvasStage({
                 </View>
 
                 <Text pointerEvents="none" style={styles.routeEditHint}>
-                  인식하지 못한 홀드는 탭해서 루트에 추가하세요.
+                  인식하지 못한 홀드는 탭해서 추가한 뒤 탑 홀드를 선택하세요.
                 </Text>
 
                 <View
@@ -679,15 +871,30 @@ export function SimulationCanvasStage({
                     </Text>
                   </Pressable>
 
+                  {selectedTopHoldObjectId ? (
+                    <Pressable
+                      onPress={handleReselectTopHold}
+                      style={({ pressed }) => [
+                        styles.reselectButton,
+                        styles.calibrationTextButton,
+                        pressed ? styles.reselectButtonPressed : null,
+                      ]}
+                    >
+                      <Text style={styles.reselectButtonText}>
+                        탑 다시 선택
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
                   <Pressable
-                    onPress={() => setFlowStep("sizingSkeleton")}
+                    onPress={() => setFlowStep("selectingTopHold")}
                     style={({ pressed }) => [
                       styles.calibrationConfirmButton,
                       pressed ? styles.calibrationConfirmButtonPressed : null,
                     ]}
                   >
                     <Text style={styles.calibrationConfirmButtonText}>
-                      다음
+                      탑 홀드 선택
                     </Text>
                   </Pressable>
                 </View>
@@ -729,7 +936,10 @@ export function SimulationCanvasStage({
                   </Pressable>
 
                   <Pressable
-                    onPress={() => setFlowStep("simulating")}
+                    onPress={() => {
+                      setIsClearComplete(false);
+                      setFlowStep("simulating");
+                    }}
                     style={({ pressed }) => [
                       styles.calibrationConfirmButton,
                       pressed ? styles.calibrationConfirmButtonPressed : null,
@@ -848,9 +1058,39 @@ export function SimulationCanvasStage({
               numberOfLines={1}
               style={styles.simulationCueText}
             >
-              이제 다음 무브를 확인해보세요!
+              {isClearComplete
+                ? "Clear! 이제 실제 벽에서 시도해보세요."
+                : "이제 다음 무브를 확인해보세요!"}
             </Text>
           </Animated.View>
+
+          {flowStep === "simulating" && isClearComplete ? (
+            <View pointerEvents="box-none" style={styles.clearActionOverlay}>
+              <View style={styles.clearActionRow}>
+                <Pressable
+                  accessibilityLabel="시뮬레이션 다시 시도"
+                  onPress={handleRetrySimulation}
+                  style={({ pressed }) => [
+                    styles.clearSecondaryButton,
+                    pressed ? styles.clearSecondaryButtonPressed : null,
+                  ]}
+                >
+                  <Text style={styles.clearSecondaryButtonText}>다시 시도</Text>
+                </Pressable>
+
+                <Pressable
+                  accessibilityLabel="시뮬레이션 완료"
+                  onPress={onClearPhoto}
+                  style={({ pressed }) => [
+                    styles.clearPrimaryButton,
+                    pressed ? styles.clearPrimaryButtonPressed : null,
+                  ]}
+                >
+                  <Text style={styles.clearPrimaryButtonText}>완료</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <BottomTabBar
@@ -1083,6 +1323,56 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.72)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
+  },
+  clearActionOverlay: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 18,
+    alignItems: "center",
+  },
+  clearActionRow: {
+    minHeight: 42,
+    borderRadius: 21,
+    padding: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(10, 10, 10, 0.58)",
+  },
+  clearSecondaryButton: {
+    height: 32,
+    minWidth: 84,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  clearSecondaryButtonPressed: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  clearSecondaryButtonText: {
+    color: brand.colors.accentSoft,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  clearPrimaryButton: {
+    height: 32,
+    minWidth: 70,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 15,
+    backgroundColor: brand.colors.primary,
+  },
+  clearPrimaryButtonPressed: {
+    backgroundColor: brand.colors.primaryPressed,
+  },
+  clearPrimaryButtonText: {
+    color: brand.colors.primaryText,
+    fontSize: 12,
+    fontWeight: "900",
   },
   overlayIconButton: {
     width: 44,

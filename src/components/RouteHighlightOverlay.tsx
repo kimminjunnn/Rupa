@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Circle, G, Polygon } from "react-native-svg";
+import Svg, { G, Polygon } from "react-native-svg";
 
 import { analysisPointToViewportPoint } from "../lib/simulationViewport";
 import { brand } from "../theme/brand";
@@ -21,6 +21,7 @@ type RouteHighlightOverlayProps = {
   objects: SimulationDetectedObject[];
   route: RouteSelectionResult | null;
   selectedStartHoldObjectId: string | null;
+  selectedTopHoldObjectId: string | null;
   transform: SimulationPhotoTransform;
   viewportHeight: number;
   viewportWidth: number;
@@ -33,6 +34,7 @@ export function RouteHighlightOverlay({
   objects,
   route,
   selectedStartHoldObjectId,
+  selectedTopHoldObjectId,
   transform,
   viewportHeight,
   viewportWidth,
@@ -62,6 +64,7 @@ export function RouteHighlightOverlay({
         ),
         isIncluded: route ? route.includedObjectIds.includes(object.id) : false,
         isSelectedStart: object.id === selectedStartHoldObjectId,
+        isSelectedTop: object.id === selectedTopHoldObjectId,
       })),
     [
       analysisImage,
@@ -69,13 +72,15 @@ export function RouteHighlightOverlay({
       photo,
       route,
       selectedStartHoldObjectId,
+      selectedTopHoldObjectId,
       transform,
       viewportHeight,
       viewportWidth,
     ],
   );
 
-  const accentColor = route?.routeColor.hex ?? brand.colors.primary;
+  const startStrokeColor = brand.colors.primary;
+  const topStrokeColor = brand.colors.accent;
 
   return (
     <View pointerEvents="none" style={styles.overlay}>
@@ -98,6 +103,11 @@ export function RouteHighlightOverlay({
                 ? "rgba(255,255,255,0)"
                 : "rgba(149,216,255,0)"
             : "rgba(255,255,255,0)";
+          const selectedStrokeColor = object.isSelectedTop
+            ? topStrokeColor
+            : object.isSelectedStart
+              ? startStrokeColor
+              : null;
 
           return (
             <G key={object.id}>
@@ -111,21 +121,10 @@ export function RouteHighlightOverlay({
               <Polygon
                 fill={fillColor}
                 points={points}
-                stroke={strokeColor}
+                stroke={selectedStrokeColor ?? strokeColor}
                 strokeLinejoin="round"
                 strokeWidth={isRouteMode ? (object.isIncluded ? 1.8 : 0.7) : 1.2}
               />
-
-              {object.isSelectedStart ? (
-                <Circle
-                  cx={object.viewportCenter.x}
-                  cy={object.viewportCenter.y}
-                  fill={accentColor}
-                  r={8}
-                  stroke="#ffffff"
-                  strokeWidth={2.5}
-                />
-              ) : null}
             </G>
           );
         })}
