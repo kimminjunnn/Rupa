@@ -6,9 +6,13 @@ import { brand } from "../theme/brand";
 
 type BottomTabBarProps = {
   active: "simulation" | "settings";
+  isNavigationLocked?: boolean;
 };
 
-export function BottomTabBar({ active }: BottomTabBarProps) {
+export function BottomTabBar({
+  active,
+  isNavigationLocked = false,
+}: BottomTabBarProps) {
   const router = useRouter();
 
   return (
@@ -16,8 +20,14 @@ export function BottomTabBar({ active }: BottomTabBarProps) {
       <View style={styles.tabRow}>
         <Pressable
           accessibilityLabel="시뮬레이션 화면"
+          accessibilityState={{ disabled: isNavigationLocked }}
+          disabled={isNavigationLocked}
           onPress={() => router.replace("/(tabs)/simulation")}
-          style={[styles.tab, active === "simulation" && styles.tabActive]}
+          style={[
+            styles.tab,
+            active === "simulation" && styles.tabActive,
+            isNavigationLocked && styles.tabDisabled,
+          ]}
         >
           <MaterialCommunityIcons
             color={
@@ -37,8 +47,14 @@ export function BottomTabBar({ active }: BottomTabBarProps) {
 
         <Pressable
           accessibilityLabel="설정 화면"
+          accessibilityState={{ disabled: isNavigationLocked }}
+          disabled={isNavigationLocked}
           onPress={() => router.replace("/(tabs)/settings")}
-          style={[styles.tab, active === "settings" && styles.tabActive]}
+          style={[
+            styles.tab,
+            active === "settings" && styles.tabActive,
+            isNavigationLocked && styles.tabDisabled,
+          ]}
         >
           <Ionicons
             color={
@@ -85,6 +101,9 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     backgroundColor: "rgba(254, 214, 96, 0.16)",
+  },
+  tabDisabled: {
+    opacity: 0.48,
   },
   label: {
     color: brand.colors.inactive,

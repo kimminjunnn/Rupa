@@ -15,6 +15,7 @@ import {
   createWallAnalysis,
   selectDetectedRoute,
 } from "../lib/routeDetectionApi";
+import { shouldLockRouteDetectionNavigation } from "../lib/routeDetectionUi";
 import {
   analysisPointToViewportPoint,
   viewportPointToAnalysisPoint,
@@ -443,6 +444,8 @@ export function SimulationCanvasStage({
       : undefined;
   const isAnalyzingHolds = flowStep === "analyzingHolds";
   const isSelectingRoute = flowStep === "selectingRoute";
+  const isRouteDetectionNavigationLocked =
+    shouldLockRouteDetectionNavigation(flowStep);
   const shouldShowSkeletonOverlay =
     flowStep === "sizingSkeleton" || flowStep === "simulating";
   const shouldShowInfoCard = flowStep !== "simulating";
@@ -776,24 +779,51 @@ export function SimulationCanvasStage({
 
             <Pressable
               accessibilityLabel="새 벽 사진 촬영"
+              accessibilityState={{
+                disabled: isRouteDetectionNavigationLocked,
+              }}
+              disabled={isRouteDetectionNavigationLocked}
               onPress={onOpenCamera}
-              style={styles.overlayIconButton}
+              style={[
+                styles.overlayIconButton,
+                isRouteDetectionNavigationLocked
+                  ? styles.overlayIconButtonDisabled
+                  : null,
+              ]}
             >
               <Ionicons color="#ffffff" name="camera-outline" size={20} />
             </Pressable>
 
             <Pressable
               accessibilityLabel="갤러리에서 벽 사진 선택"
+              accessibilityState={{
+                disabled: isRouteDetectionNavigationLocked,
+              }}
+              disabled={isRouteDetectionNavigationLocked}
               onPress={onOpenLibrary}
-              style={styles.overlayIconButton}
+              style={[
+                styles.overlayIconButton,
+                isRouteDetectionNavigationLocked
+                  ? styles.overlayIconButtonDisabled
+                  : null,
+              ]}
             >
               <Ionicons color="#ffffff" name="images-outline" size={20} />
             </Pressable>
 
             <Pressable
               accessibilityLabel="현재 벽 사진 삭제"
+              accessibilityState={{
+                disabled: isRouteDetectionNavigationLocked,
+              }}
+              disabled={isRouteDetectionNavigationLocked}
               onPress={() => setConfirmVisible(true)}
-              style={styles.overlayIconButton}
+              style={[
+                styles.overlayIconButton,
+                isRouteDetectionNavigationLocked
+                  ? styles.overlayIconButtonDisabled
+                  : null,
+              ]}
             >
               <Ionicons color="#ffffff" name="trash-outline" size={20} />
             </Pressable>
@@ -823,7 +853,10 @@ export function SimulationCanvasStage({
           </Animated.View>
         </View>
 
-        <BottomTabBar active="simulation" />
+        <BottomTabBar
+          active="simulation"
+          isNavigationLocked={isRouteDetectionNavigationLocked}
+        />
 
         <ConfirmModal
           body="현재 시뮬레이션에 올린 사진이 초기화됩니다."
