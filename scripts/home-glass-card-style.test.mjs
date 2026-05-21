@@ -7,19 +7,21 @@ const source = readFileSync(
   "utf8",
 );
 
-test("HomeGlassCard keeps only the logo and simulator label in a compact hero card", () => {
-  assert.match(source, /minHeight:\s*150,/);
-  assert.match(source, /logoEyebrowGroup:\s*{[\s\S]*?gap:\s*4,/);
-  assert.match(source, /<View style={styles\.logoEyebrowGroup}>[\s\S]*?styles\.logoImage[\s\S]*?styles\.eyebrow[\s\S]*?<\/View>/);
+test("HomeGlassCard keeps only the exported logo image", () => {
+  assert.match(source, /<Image[\s\S]*?styles\.logoImage[\s\S]*?\/>/);
+  assert.doesNotMatch(source, /볼더링 시뮬레이터/);
+  assert.doesNotMatch(source, /styles\.eyebrow/);
+  assert.doesNotMatch(source, /logoEyebrowGroup/);
   assert.doesNotMatch(source, /styles\.title/);
   assert.doesNotMatch(source, /styles\.description/);
 });
 
-test("HomeGlassCard keeps the remaining brand mark centered in a full-width card", () => {
-  assert.match(source, /shell:\s*{[\s\S]*?alignSelf:\s*"stretch",/);
-  assert.doesNotMatch(source, /alignSelf:\s*"center"/);
+test("HomeGlassCard keeps the logo centered without card chrome", () => {
+  assert.doesNotMatch(source, /BlurView/);
+  assert.doesNotMatch(source, /styles\.shell/);
+  assert.doesNotMatch(source, /styles\.blurLayer/);
+  assert.match(source, /content:\s*{[\s\S]*?alignItems:\s*"center",[\s\S]*?justifyContent:\s*"center",/);
   assert.match(source, /logoImage:\s*{[\s\S]*?width:\s*190,[\s\S]*?height:\s*79,/);
-  assert.match(source, /eyebrow:\s*{[\s\S]*?fontSize:\s*12,[\s\S]*?letterSpacing:\s*2\.8,/);
 });
 
 test("HomeGlassCard removes the transparent decorative overlay layers", () => {

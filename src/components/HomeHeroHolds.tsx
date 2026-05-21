@@ -12,7 +12,6 @@ export function HomeHeroHolds() {
         style={styles.background}
       />
       <View style={styles.readabilityOverlay} />
-      <View style={styles.warmCenterGlow} />
     </View>
   );
 }
@@ -26,14 +25,5 @@ const styles = StyleSheet.create({
   readabilityOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(37, 29, 21, 0.02)",
-  },
-  warmCenterGlow: {
-    position: "absolute",
-    top: "22%",
-    left: "8%",
-    right: "8%",
-    height: "40%",
-    borderRadius: 999,
-    backgroundColor: "rgba(255, 244, 215, 0.1)",
   },
 });

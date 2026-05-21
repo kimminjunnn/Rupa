@@ -28,6 +28,10 @@ const homeGlassCardSource = new URL(
   "../src/components/HomeGlassCard.tsx",
   import.meta.url,
 );
+const homeHeroHoldsSource = new URL(
+  "../src/components/HomeHeroHolds.tsx",
+  import.meta.url,
+);
 
 test("home screen keeps internal skeleton lab out of the user entry flow", async () => {
   const source = await readFile(homeSource, "utf8");
@@ -38,10 +42,14 @@ test("home screen keeps internal skeleton lab out of the user entry flow", async
 
 test("home hero image extends behind top and bottom safe areas", async () => {
   const source = await readFile(homeSource, "utf8");
+  const heroSource = await readFile(homeHeroHoldsSource, "utf8");
   const safeAreaBlock = source.match(/safeArea:\s*\{[^}]*\}/)?.[0] ?? "";
 
   assert.match(source, /<View style=\{styles\.screen\}>[\s\S]*<HomeHeroHolds \/>[\s\S]*<SafeAreaView/);
   assert.doesNotMatch(safeAreaBlock, /backgroundColor/);
+  assert.match(heroSource, /gym-wall-bg-bright\.png/);
+  assert.doesNotMatch(heroSource, /warmCenterGlow/);
+  assert.doesNotMatch(heroSource, /borderRadius:\s*999/);
 });
 
 test("home glass card uses the exported Rupa logo image", async () => {
@@ -54,12 +62,13 @@ test("home glass card uses the exported Rupa logo image", async () => {
   assert.match(source, /logoImage/);
   assert.match(source, /width: 190/);
   assert.match(source, /height: 79/);
-  assert.match(source, /볼더링 시뮬레이터/);
+  assert.doesNotMatch(source, /볼더링 시뮬레이터/);
+  assert.doesNotMatch(source, /styles\.eyebrow/);
   assert.doesNotMatch(source, /styles\.title/);
   assert.doesNotMatch(source, /styles\.description/);
-  assert.match(source, /alignSelf: "stretch"/);
-  assert.doesNotMatch(source, /alignSelf: "center"/);
-  assert.match(source, /minHeight: 150/);
+  assert.doesNotMatch(source, /BlurView/);
+  assert.doesNotMatch(source, /styles\.shell/);
+  assert.doesNotMatch(source, /styles\.blurLayer/);
   assert.doesNotMatch(source, /styles\.softFill/);
   assert.doesNotMatch(source, /styles\.topShine/);
   assert.doesNotMatch(source, /styles\.innerGlow/);
