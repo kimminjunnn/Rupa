@@ -657,7 +657,7 @@ export function SimulationCanvasStage({
         if (holdCount === 0) {
           return "인식된 홀드가 없어요";
         }
-        return "스타트 홀드를 탭하세요";
+        return "스타트 홀드를 선택하세요";
       case "selectingRoute":
         return "같은 색 루트를 찾는 중";
       case "selectingTopHold":
@@ -795,7 +795,9 @@ export function SimulationCanvasStage({
                             }}
                             style={({ pressed }) => [
                               styles.retryAnalysisButton,
-                              pressed ? styles.retryAnalysisButtonPressed : null,
+                              pressed
+                                ? styles.retryAnalysisButtonPressed
+                                : null,
                             ]}
                           >
                             <Ionicons
@@ -851,7 +853,7 @@ export function SimulationCanvasStage({
                 </View>
 
                 <Text pointerEvents="none" style={styles.routeEditHint}>
-                  인식하지 못한 홀드는 탭해서 추가한 뒤 탑 홀드를 선택하세요.
+                  인식되지 않은 홀드를 탭하여 선택해주세요.
                 </Text>
 
                 <View
@@ -894,7 +896,7 @@ export function SimulationCanvasStage({
                     ]}
                   >
                     <Text style={styles.calibrationConfirmButtonText}>
-                      탑 홀드 선택
+                      확인
                     </Text>
                   </Pressable>
                 </View>
@@ -917,7 +919,8 @@ export function SimulationCanvasStage({
                 </View>
 
                 <Text pointerEvents="none" style={styles.routeEditHint}>
-                  두 손가락으로 크기를 맞추고, 끌어서 위치를 조정하세요.
+                  두 손가락으로 캐릭터의 크기를 맞추고, 스타트 자세를
+                  만들어주세요.
                 </Text>
 
                 <View
