@@ -52,10 +52,18 @@ test("home glass card uses the exported Rupa logo image", async () => {
   assert.doesNotMatch(source, /<Text style=\{styles\.brand\}/);
   assert.doesNotMatch(source, /logoPlate/);
   assert.match(source, /logoImage/);
-  assert.match(source, /width: 178/);
-  assert.match(source, /height: 74/);
-  assert.match(source, /fontSize: 32/);
-  assert.match(source, /minHeight: 430/);
+  assert.match(source, /width: 190/);
+  assert.match(source, /height: 79/);
+  assert.match(source, /볼더링 시뮬레이터/);
+  assert.doesNotMatch(source, /styles\.title/);
+  assert.doesNotMatch(source, /styles\.description/);
+  assert.match(source, /alignSelf: "stretch"/);
+  assert.doesNotMatch(source, /alignSelf: "center"/);
+  assert.match(source, /minHeight: 150/);
+  assert.doesNotMatch(source, /styles\.softFill/);
+  assert.doesNotMatch(source, /styles\.topShine/);
+  assert.doesNotMatch(source, /styles\.innerGlow/);
+  assert.doesNotMatch(source, /styles\.borderOverlay/);
 });
 
 test("tab screens remove the decorative app header", async () => {
