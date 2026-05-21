@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(37, 29, 21, 0.1)",
+    borderColor: brand.colors.border,
     backgroundColor: "rgba(255, 248, 231, 0.92)",
     shadowColor: brand.colors.text,
     shadowOpacity: 0.09,
@@ -189,6 +189,8 @@ const styles = StyleSheet.create({
     width: 132,
     height: 132,
     borderRadius: 28,
+    borderWidth: 1,
+    borderColor: brand.colors.border,
     backgroundColor: brand.colors.primary,
   },
   primaryTitle: {
@@ -225,6 +227,8 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: brand.colors.border,
     backgroundColor: brand.colors.primarySoft,
   },
   secondaryCopy: {
@@ -252,8 +256,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(37, 29, 21, 0.1)",
-    backgroundColor: "rgba(234, 212, 167, 0.52)",
+    borderColor: brand.colors.border,
+    backgroundColor: "rgba(255, 248, 231, 0.9)",
   },
   profileStripRequired: {
     borderWidth: 2,
@@ -274,6 +278,8 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 15,
+    borderWidth: 1,
+    borderColor: brand.colors.border,
     backgroundColor: brand.colors.primarySoft,
   },
   profileCopy: {

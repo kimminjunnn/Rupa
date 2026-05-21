@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/rupa-app-icon/rupa-icon-1024-appstore.png",
+      "image": "./assets/rupa-splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#f7f0e6"
     },

@@ -189,7 +189,11 @@ export default function SettingsScreen() {
               </View>
 
               <View style={styles.metricIconBox}>
-                <Ionicons color={brand.colors.primaryText} name="resize-outline" size={22} />
+                <Ionicons
+                  color={brand.colors.primaryText}
+                  name="resize-outline"
+                  size={22}
+                />
               </View>
             </View>
 
@@ -260,16 +264,17 @@ export default function SettingsScreen() {
             </View>
 
             <View style={styles.fieldFooterRow}>
-              <Text style={styles.helper}>
-                현재 모드:{" "}
-                {draftWingspanMode === "auto" ? "자동 계산" : "직접 입력"}
-              </Text>
+              <Text style={styles.helper}> </Text>
 
               <Pressable
                 onPress={handleRestoreAuto}
                 style={styles.inlineAction}
               >
-                <Ionicons color={brand.colors.primaryText} name="refresh" size={14} />
+                <Ionicons
+                  color={brand.colors.primaryText}
+                  name="refresh"
+                  size={14}
+                />
                 <Text style={styles.inlineActionText}>자동 계산 복원</Text>
               </Pressable>
             </View>
@@ -287,7 +292,11 @@ export default function SettingsScreen() {
 
             <Pressable onPress={handleOpenConfirm} style={styles.confirmButton}>
               <Text style={styles.confirmButtonText}>확인</Text>
-              <Ionicons color={brand.colors.primaryText} name="arrow-forward" size={24} />
+              <Ionicons
+                color={brand.colors.primaryText}
+                name="arrow-forward"
+                size={24}
+              />
             </Pressable>
           </View>
         </ScrollView>
@@ -335,7 +344,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(37, 29, 21, 0.1)",
+    borderColor: brand.colors.border,
     backgroundColor: "rgba(255, 248, 231, 0.9)",
   },
   introIcon: {
@@ -343,6 +352,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 48,
     height: 48,
+    borderWidth: 1,
+    borderColor: brand.colors.border,
     borderRadius: 16,
     backgroundColor: brand.colors.primarySoft,
   },
@@ -369,7 +380,7 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: "rgba(37, 29, 21, 0.1)",
+    borderColor: brand.colors.border,
     backgroundColor: "rgba(255, 248, 231, 0.9)",
   },
   fieldHeaderRow: {
