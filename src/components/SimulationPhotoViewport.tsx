@@ -3,7 +3,9 @@ import { Image, StyleSheet, View } from "react-native";
 import {
   getBaseDimensions,
   resolveAbsoluteOffsets,
+  resolvePhotoLayerFrame,
 } from "../lib/simulationViewport";
+import { brand } from "../theme/brand";
 import type {
   SimulationPhoto,
   SimulationPhotoTransform,
@@ -30,6 +32,15 @@ export function SimulationPhotoViewport({
     viewportWidth,
     viewportHeight,
   );
+  const frame = resolvePhotoLayerFrame(
+    absoluteOffsets.translateX,
+    absoluteOffsets.translateY,
+    transform.scale,
+    baseDimensions.width,
+    baseDimensions.height,
+    viewportWidth,
+    viewportHeight,
+  );
 
   return (
     <View style={styles.viewport}>
@@ -37,12 +48,10 @@ export function SimulationPhotoViewport({
         style={[
           styles.photoLayer,
           {
-            width: baseDimensions.width * transform.scale,
-            height: baseDimensions.height * transform.scale,
-            transform: [
-              { translateX: absoluteOffsets.translateX },
-              { translateY: absoluteOffsets.translateY },
-            ],
+            left: frame.left,
+            top: frame.top,
+            width: frame.width,
+            height: frame.height,
           },
         ]}
       >
@@ -62,9 +71,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-    backgroundColor: "#0f0f0f",
+    backgroundColor: brand.colors.wall,
   },
   photoLayer: {
+    position: "absolute",
     alignItems: "center",
     justifyContent: "center",
   },

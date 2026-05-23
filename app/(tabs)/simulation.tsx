@@ -1,23 +1,45 @@
 import * as ImagePicker from "expo-image-picker";
-import { Alert } from "react-native";
+import { Alert, Image } from "react-native";
 
 import { SimulationAdjustStage } from "../../src/components/SimulationAdjustStage";
 import { SimulationCanvasStage } from "../../src/components/SimulationCanvasStage";
 import { SimulationInputStage } from "../../src/components/SimulationInputStage";
+import {
+  resolveReliablePhotoDimensions,
+  type PhotoDimensions,
+} from "../../src/lib/photoDimensions";
 import { useSimulationStore } from "../../src/store/useSimulationStore";
 import type {
   SimulationPhoto,
   SimulationPhotoSource,
 } from "../../src/types/simulation";
 
-function createPhotoPayload(
+function getDecodedImageDimensions(uri: string): Promise<PhotoDimensions | null> {
+  return new Promise((resolve) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      () => resolve(null),
+    );
+  });
+}
+
+async function createPhotoPayload(
   asset: ImagePicker.ImagePickerAsset,
   source: SimulationPhotoSource,
-): SimulationPhoto {
+): Promise<SimulationPhoto> {
+  const dimensions = resolveReliablePhotoDimensions(
+    {
+      width: asset.width,
+      height: asset.height,
+    },
+    await getDecodedImageDimensions(asset.uri),
+  );
+
   return {
     uri: asset.uri,
-    width: Math.max(1, asset.width || 1),
-    height: Math.max(1, asset.height || 1),
+    width: dimensions.width,
+    height: dimensions.height,
     source,
     updatedAt: Date.now(),
   };
@@ -77,7 +99,7 @@ export default function SimulationScreen() {
         return;
       }
 
-      setDraftPhoto(createPhotoPayload(asset, source));
+      setDraftPhoto(await createPhotoPayload(asset, source));
     } catch {
       Alert.alert(
         source === "camera" ? "카메라 사용 불가" : "불러오기 실패",
@@ -102,8 +124,6 @@ export default function SimulationScreen() {
     return (
       <SimulationCanvasStage
         onClearPhoto={clearPhoto}
-        onOpenCamera={() => void pickPhoto("camera")}
-        onOpenLibrary={() => void pickPhoto("library")}
         photo={photo}
         transform={transform}
       />

@@ -7,9 +7,9 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { brand } from "../theme/brand";
 import {
-  clampTranslations,
   clampValue,
   getBaseDimensions,
+  resolveAdjustmentTranslations,
   resolveTransformRatios,
 } from "../lib/simulationViewport";
 import type {
@@ -62,7 +62,7 @@ export function SimulationAdjustStage({
         return;
       }
 
-      const clamped = clampTranslations(
+      const clamped = resolveAdjustmentTranslations(
         startX.value + event.translationX,
         startY.value + event.translationY,
         scale.value,
@@ -90,7 +90,7 @@ export function SimulationAdjustStage({
         1,
         MAX_ADJUST_SCALE,
       );
-      const clamped = clampTranslations(
+      const clamped = resolveAdjustmentTranslations(
         translateX.value,
         translateY.value,
         nextScale,
@@ -110,12 +110,21 @@ export function SimulationAdjustStage({
       return {};
     }
 
+    const clamped = resolveAdjustmentTranslations(
+      translateX.value,
+      translateY.value,
+      scale.value,
+      baseDimensions.width,
+      baseDimensions.height,
+      viewport.width,
+      viewport.height,
+    );
+
     return {
-      width: baseDimensions.width * scale.value,
-      height: baseDimensions.height * scale.value,
       transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
+        { translateX: clamped.x },
+        { translateY: clamped.y },
+        { scale: scale.value },
       ],
     };
   });
@@ -130,16 +139,21 @@ export function SimulationAdjustStage({
       return;
     }
 
+    const transform = resolveTransformRatios(
+      translateX.value,
+      translateY.value,
+      scale.value,
+      baseDimensions.width,
+      baseDimensions.height,
+      viewport.width,
+      viewport.height,
+    );
+
     onApply(
-      resolveTransformRatios(
-        translateX.value,
-        translateY.value,
-        scale.value,
-        baseDimensions.width,
-        baseDimensions.height,
-        viewport.width,
-        viewport.height,
-      ),
+      {
+        ...transform,
+        offsetYRatio: scale.value > 1 ? transform.offsetYRatio : 0,
+      },
     );
   }
 
@@ -154,7 +168,7 @@ export function SimulationAdjustStage({
           <View style={styles.adjustTitleWrap}>
             <Text style={styles.adjustTitle}>사진 위치 조정</Text>
             <Text style={styles.adjustSubtitle}>
-              가운데 영역 안에서 확대하고 위치를 맞춰보세요.
+              확대한 뒤 위치를 맞춰보세요.
             </Text>
           </View>
         </View>
@@ -245,6 +259,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0f0f0f",
   },
   photoLayer: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",

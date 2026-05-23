@@ -76,6 +76,30 @@ export function clampTranslations(
   };
 }
 
+export function resolveAdjustmentTranslations(
+  translateX: number,
+  translateY: number,
+  scale: number,
+  _baseWidth: number,
+  _baseHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+) {
+  "worklet";
+
+  if (scale <= 1) {
+    return { x: 0, y: 0 };
+  }
+
+  const maxOffsetX = (viewportWidth * scale - viewportWidth) / 2;
+  const maxOffsetY = (viewportHeight * scale - viewportHeight) / 2;
+
+  return {
+    x: clampValue(translateX, -maxOffsetX, maxOffsetX),
+    y: clampValue(translateY, -maxOffsetY, maxOffsetY),
+  };
+}
+
 export function resolveTransformRatios(
   translateX: number,
   translateY: number,
@@ -118,6 +142,37 @@ export function resolveAbsoluteOffsets(
   return {
     translateX: maxOffsetX * transform.offsetXRatio,
     translateY: maxOffsetY * transform.offsetYRatio,
+  };
+}
+
+export function resolvePhotoLayerFrame(
+  translateX: number,
+  translateY: number,
+  scale: number,
+  baseWidth: number,
+  baseHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+) {
+  "worklet";
+
+  const clamped = clampTranslations(
+    translateX,
+    translateY,
+    scale,
+    baseWidth,
+    baseHeight,
+    viewportWidth,
+    viewportHeight,
+  );
+  const width = baseWidth * scale;
+  const height = baseHeight * scale;
+
+  return {
+    left: viewportWidth / 2 - width / 2 + clamped.x,
+    top: viewportHeight / 2 - height / 2 + clamped.y,
+    width,
+    height,
   };
 }
 

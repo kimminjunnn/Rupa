@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   LayoutChangeEvent,
   Pressable,
   StyleSheet,
@@ -35,7 +36,6 @@ import type {
   WallAnalysisResult,
 } from "../types/simulation";
 import type { SkeletonPose } from "../types/skeletonPose";
-import { BottomTabBar } from "./BottomTabBar";
 import { ConfirmModal } from "./ConfirmModal";
 import { brand } from "../theme/brand";
 import { RouteHighlightOverlay } from "./RouteHighlightOverlay";
@@ -46,12 +46,12 @@ import {
 } from "./SkeletonPoseOverlay";
 import { SimulationPhotoViewport } from "./SimulationPhotoViewport";
 
+const rupaLogo = require("../../assets/rupa-logo.png");
+
 type SimulationCanvasStageProps = {
   photo: SimulationPhoto;
   transform: SimulationPhotoTransform;
   onClearPhoto: () => void;
-  onOpenCamera: () => void;
-  onOpenLibrary: () => void;
 };
 
 type CanvasFlowStep =
@@ -67,8 +67,6 @@ export function SimulationCanvasStage({
   photo,
   transform,
   onClearPhoto,
-  onOpenCamera,
-  onOpenLibrary,
 }: SimulationCanvasStageProps) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -632,9 +630,9 @@ export function SimulationCanvasStage({
   const isSelectingRoute = flowStep === "selectingRoute";
   const isRouteDetectionNavigationLocked =
     shouldLockRouteDetectionNavigation(flowStep);
+  const canUseSkeletonHistory = flowStep === "simulating";
   const shouldShowSkeletonOverlay =
     flowStep === "sizingSkeleton" || flowStep === "simulating";
-  const shouldShowInfoCard = flowStep !== "simulating";
   const shouldShowRetryButton = shouldShowWallAnalysisRetry({
     analysisResult,
     flowStep,
@@ -649,25 +647,25 @@ export function SimulationCanvasStage({
   const infoTitle = (() => {
     switch (flowStep) {
       case "analyzingHolds":
-        return "홀드 테두리를 찾는 중";
+        return "벽 사진에서 홀드 테두리를 찾고 있어요.";
       case "selectingStartHold":
         if (!analysisResult) {
-          return "분석 결과를 불러오지 못했어요";
+          return "분석 결과를 불러오지 못했어요.";
         }
         if (holdCount === 0) {
-          return "인식된 홀드가 없어요";
+          return "인식된 홀드가 없어요. 다른 사진으로 다시 시도해보세요.";
         }
-        return "스타트 홀드를 선택하세요";
+        return "스타트 홀드를 선택하세요.";
       case "selectingRoute":
-        return "같은 색 루트를 찾는 중";
+        return "선택한 홀드와 같은 색 루트를 찾고 있어요.";
       case "selectingTopHold":
-        return "탑 홀드를 탭하세요";
+        return "탑 홀드를 선택하세요.";
       case "routeEditing":
-        return "루트 홀드를 확인하세요";
+        return "인식되지 않은 홀드를 탭하여 루트를 보정하세요.";
       case "sizingSkeleton":
-        return "스켈레톤 크기와 위치를 맞춰주세요";
+        return "캐릭터의 크기를 조정하고, 스타트 자세를 취해주세요.";
       case "simulating":
-        return "손과 발을 움직여 다음 동작을 확인하세요";
+        return "캐릭터를 움직여 무브를 시뮬레이션해보세요.";
     }
   })();
 
@@ -675,9 +673,241 @@ export function SimulationCanvasStage({
     ? "벽 사진을 분석하고 있어요"
     : "같은 색 홀드를 묶고 있어요";
 
+  function renderInstructionPanel() {
+    return (
+      <View pointerEvents="box-none" style={styles.instructionPanelOverlay}>
+        <View pointerEvents="box-none" style={styles.instructionPanel}>
+          <Text pointerEvents="none" style={styles.instructionEyebrow}>
+            ROUTE DETECTION
+          </Text>
+
+          <Text pointerEvents="none" style={styles.instructionTitle}>
+            {infoTitle}
+          </Text>
+
+          {isAnalyzingHolds || isSelectingRoute ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={brand.colors.primary} size="small" />
+              <Text style={styles.loadingText}>{loadingText}</Text>
+            </View>
+          ) : null}
+
+          {highlightError ? (
+            <Text pointerEvents="none" style={styles.errorText}>
+              {highlightError}
+            </Text>
+          ) : null}
+
+          {shouldShowFallbackStartButton || shouldShowRetryButton ? (
+            <View pointerEvents="box-none" style={styles.instructionActionRow}>
+              {shouldShowFallbackStartButton ? (
+                <Pressable
+                  accessibilityLabel="분석 없이 시뮬레이션 시작"
+                  onPress={handleStartWithoutAnalysis}
+                  style={({ pressed }) => [
+                    styles.startWithoutAnalysisButton,
+                    pressed ? styles.startWithoutAnalysisButtonPressed : null,
+                  ]}
+                >
+                  <Ionicons
+                    color={brand.colors.primaryText}
+                    name="body-outline"
+                    size={15}
+                  />
+                  <Text style={styles.startWithoutAnalysisButtonText}>
+                    분석 없이 시작
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              {shouldShowRetryButton ? (
+                <Pressable
+                  accessibilityLabel="사진 분석 다시 시도"
+                  onPress={handleRetryAnalysis}
+                  style={({ pressed }) => [
+                    styles.retryAnalysisButton,
+                    pressed ? styles.retryAnalysisButtonPressed : null,
+                  ]}
+                >
+                  <Ionicons
+                    color={brand.colors.text}
+                    name="refresh"
+                    size={15}
+                  />
+                  <Text style={styles.retryAnalysisButtonText}>다시 시도</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
+          {flowStep === "routeEditing" ? (
+            <View pointerEvents="box-none" style={styles.instructionActionRow}>
+              <Pressable
+                onPress={handleReselectRoute}
+                style={({ pressed }) => [
+                  styles.reselectButton,
+                  pressed ? styles.reselectButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.reselectButtonText}>
+                  스타트 다시 선택
+                </Text>
+              </Pressable>
+
+              {selectedTopHoldObjectId ? (
+                <Pressable
+                  onPress={handleReselectTopHold}
+                  style={({ pressed }) => [
+                    styles.reselectButton,
+                    pressed ? styles.reselectButtonPressed : null,
+                  ]}
+                >
+                  <Text style={styles.reselectButtonText}>탑 다시 선택</Text>
+                </Pressable>
+              ) : null}
+
+              <Pressable
+                onPress={() => setFlowStep("selectingTopHold")}
+                style={({ pressed }) => [
+                  styles.calibrationConfirmButton,
+                  pressed ? styles.calibrationConfirmButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.calibrationConfirmButtonText}>확인</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {flowStep === "sizingSkeleton" ? (
+            <View pointerEvents="box-none" style={styles.instructionActionRow}>
+              <Pressable
+                onPress={() => setFlowStep("routeEditing")}
+                style={({ pressed }) => [
+                  styles.reselectButton,
+                  pressed ? styles.reselectButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.reselectButtonText}>이전</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setIsClearComplete(false);
+                  setFlowStep("simulating");
+                }}
+                style={({ pressed }) => [
+                  styles.calibrationConfirmButton,
+                  pressed ? styles.calibrationConfirmButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.calibrationConfirmButtonText}>완료</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {flowStep === "simulating" && isClearComplete ? (
+            <View pointerEvents="box-none" style={styles.instructionActionRow}>
+              <Pressable
+                accessibilityLabel="시뮬레이션 다시 시도"
+                onPress={handleRetrySimulation}
+                style={({ pressed }) => [
+                  styles.clearSecondaryButton,
+                  pressed ? styles.clearSecondaryButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.clearSecondaryButtonText}>다시 시도</Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityLabel="시뮬레이션 완료"
+                onPress={onClearPhoto}
+                style={({ pressed }) => [
+                  styles.clearPrimaryButton,
+                  pressed ? styles.clearPrimaryButtonPressed : null,
+                ]}
+              >
+                <Text style={styles.clearPrimaryButtonText}>완료</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView edges={["top"]} style={styles.safeArea}>
       <View style={styles.screen}>
+        <View style={styles.canvasChrome}>
+          <View style={styles.canvasChromeHeader}>
+            <Image
+              accessibilityIgnoresInvertColors
+              resizeMode="contain"
+              source={rupaLogo}
+              style={styles.canvasHeaderLogo}
+            />
+
+            <View style={styles.canvasChromeActions}>
+              <Pressable
+                accessibilityLabel="스켈레톤 이동 실행 취소"
+                disabled={
+                  !canUseSkeletonHistory || !skeletonHistoryState.canUndo
+                }
+                onPress={() => skeletonOverlayRef.current?.undo()}
+                style={[
+                  styles.overlayIconButton,
+                  !canUseSkeletonHistory || !skeletonHistoryState.canUndo
+                    ? styles.overlayIconButtonDisabled
+                    : null,
+                ]}
+              >
+                <Ionicons
+                  color={brand.colors.text}
+                  name="arrow-undo"
+                  size={19}
+                />
+              </Pressable>
+
+              <Pressable
+                accessibilityLabel="스켈레톤 이동 다시 실행"
+                disabled={
+                  !canUseSkeletonHistory || !skeletonHistoryState.canRedo
+                }
+                onPress={() => skeletonOverlayRef.current?.redo()}
+                style={[
+                  styles.overlayIconButton,
+                  !canUseSkeletonHistory || !skeletonHistoryState.canRedo
+                    ? styles.overlayIconButtonDisabled
+                    : null,
+                ]}
+              >
+                <Ionicons
+                  color={brand.colors.text}
+                  name="arrow-redo"
+                  size={19}
+                />
+              </Pressable>
+
+              <Pressable
+                accessibilityLabel="현재 벽 사진 닫기"
+                accessibilityState={{
+                  disabled: isRouteDetectionNavigationLocked,
+                }}
+                disabled={isRouteDetectionNavigationLocked}
+                onPress={() => setConfirmVisible(true)}
+                style={[
+                  styles.overlayIconButton,
+                  isRouteDetectionNavigationLocked
+                    ? styles.overlayIconButtonDisabled
+                    : null,
+                ]}
+              >
+                <Ionicons color={brand.colors.text} name="close" size={22} />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
         <View onLayout={handleViewportLayout} style={styles.canvasArea}>
           {viewport.width > 0 && viewport.height > 0 ? (
             <SimulationPhotoViewport
@@ -727,95 +957,7 @@ export function SimulationCanvasStage({
                 })
               }
               style={styles.touchLayer}
-            >
-              {shouldShowInfoCard ? (
-                <View style={styles.infoOverlay}>
-                  <View style={styles.infoCard}>
-                    <View style={styles.infoHeaderRow}>
-                      <Text style={styles.infoEyebrow}>ROUTE DETECTION</Text>
-                      {!isAnalyzingHolds && analysisResult ? (
-                        <View style={styles.statusChip}>
-                          <Text style={styles.statusChipText}>
-                            {routeResult
-                              ? `${routeResult.includedObjectIds.length} route`
-                              : `${holdCount} holds`}
-                          </Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text style={styles.infoTitle}>{infoTitle}</Text>
-
-                    {isAnalyzingHolds || isSelectingRoute ? (
-                      <View style={styles.loadingRow}>
-                        <ActivityIndicator
-                          color={brand.colors.primary}
-                          size="small"
-                        />
-                        <Text style={styles.loadingText}>{loadingText}</Text>
-                      </View>
-                    ) : null}
-
-                    {highlightError ? (
-                      <Text style={styles.errorText}>{highlightError}</Text>
-                    ) : null}
-
-                    {shouldShowFallbackStartButton || shouldShowRetryButton ? (
-                      <View style={styles.analysisFailureActions}>
-                        {shouldShowFallbackStartButton ? (
-                          <Pressable
-                            accessibilityLabel="분석 없이 시뮬레이션 시작"
-                            onPress={(event) => {
-                              event.stopPropagation();
-                              handleStartWithoutAnalysis();
-                            }}
-                            style={({ pressed }) => [
-                              styles.startWithoutAnalysisButton,
-                              pressed
-                                ? styles.startWithoutAnalysisButtonPressed
-                                : null,
-                            ]}
-                          >
-                            <Ionicons
-                              color={brand.colors.primaryText}
-                              name="body-outline"
-                              size={15}
-                            />
-                            <Text style={styles.startWithoutAnalysisButtonText}>
-                              분석 없이 시작
-                            </Text>
-                          </Pressable>
-                        ) : null}
-
-                        {shouldShowRetryButton ? (
-                          <Pressable
-                            accessibilityLabel="사진 분석 다시 시도"
-                            onPress={(event) => {
-                              event.stopPropagation();
-                              handleRetryAnalysis();
-                            }}
-                            style={({ pressed }) => [
-                              styles.retryAnalysisButton,
-                              pressed
-                                ? styles.retryAnalysisButtonPressed
-                                : null,
-                            ]}
-                          >
-                            <Ionicons
-                              color={brand.colors.text}
-                              name="refresh"
-                              size={15}
-                            />
-                            <Text style={styles.retryAnalysisButtonText}>
-                              다시 시도
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              ) : null}
-            </Pressable>
+            />
           ) : null}
 
           {shouldShowSkeletonOverlay &&
@@ -838,209 +980,7 @@ export function SimulationCanvasStage({
             />
           ) : null}
 
-          {flowStep === "routeEditing" ? (
-            <View pointerEvents="box-none" style={styles.routeEditPanelOverlay}>
-              <View pointerEvents="box-none" style={styles.routeEditPanel}>
-                <View pointerEvents="none" style={styles.infoHeaderRow}>
-                  <Text style={styles.infoEyebrow}>ROUTE EDIT</Text>
-                  <View style={styles.statusChip}>
-                    <Text style={styles.statusChipText}>
-                      {routeResult
-                        ? `${routeResult.includedObjectIds.length} route`
-                        : `${holdCount} holds`}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text pointerEvents="none" style={styles.routeEditHint}>
-                  인식되지 않은 홀드를 탭하여 선택해주세요.
-                </Text>
-
-                <View
-                  pointerEvents="box-none"
-                  style={styles.calibrationActionRow}
-                >
-                  <Pressable
-                    onPress={handleReselectRoute}
-                    style={({ pressed }) => [
-                      styles.reselectButton,
-                      styles.calibrationTextButton,
-                      pressed ? styles.reselectButtonPressed : null,
-                    ]}
-                  >
-                    <Text style={styles.reselectButtonText}>
-                      스타트 다시 선택
-                    </Text>
-                  </Pressable>
-
-                  {selectedTopHoldObjectId ? (
-                    <Pressable
-                      onPress={handleReselectTopHold}
-                      style={({ pressed }) => [
-                        styles.reselectButton,
-                        styles.calibrationTextButton,
-                        pressed ? styles.reselectButtonPressed : null,
-                      ]}
-                    >
-                      <Text style={styles.reselectButtonText}>
-                        탑 다시 선택
-                      </Text>
-                    </Pressable>
-                  ) : null}
-
-                  <Pressable
-                    onPress={() => setFlowStep("selectingTopHold")}
-                    style={({ pressed }) => [
-                      styles.calibrationConfirmButton,
-                      pressed ? styles.calibrationConfirmButtonPressed : null,
-                    ]}
-                  >
-                    <Text style={styles.calibrationConfirmButtonText}>
-                      확인
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          ) : null}
-
-          {flowStep === "sizingSkeleton" ? (
-            <View pointerEvents="box-none" style={styles.routeEditPanelOverlay}>
-              <View pointerEvents="box-none" style={styles.routeEditPanel}>
-                <View pointerEvents="none" style={styles.infoHeaderRow}>
-                  <Text style={styles.infoEyebrow}>SKELETON FIT</Text>
-                  <View style={styles.statusChip}>
-                    <Text style={styles.statusChipText}>
-                      {routeResult
-                        ? `${routeResult.includedObjectIds.length} route`
-                        : `${holdCount} holds`}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text pointerEvents="none" style={styles.routeEditHint}>
-                  두 손가락으로 캐릭터의 크기를 맞추고, 스타트 자세를
-                  만들어주세요.
-                </Text>
-
-                <View
-                  pointerEvents="box-none"
-                  style={styles.calibrationActionRow}
-                >
-                  <Pressable
-                    onPress={() => setFlowStep("routeEditing")}
-                    style={({ pressed }) => [
-                      styles.reselectButton,
-                      styles.calibrationTextButton,
-                      pressed ? styles.reselectButtonPressed : null,
-                    ]}
-                  >
-                    <Text style={styles.reselectButtonText}>이전</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => {
-                      setIsClearComplete(false);
-                      setFlowStep("simulating");
-                    }}
-                    style={({ pressed }) => [
-                      styles.calibrationConfirmButton,
-                      pressed ? styles.calibrationConfirmButtonPressed : null,
-                    ]}
-                  >
-                    <Text style={styles.calibrationConfirmButtonText}>
-                      완료
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          ) : null}
-
-          <View style={styles.canvasTopOverlay}>
-            {flowStep === "simulating" ? (
-              <>
-                <Pressable
-                  accessibilityLabel="스켈레톤 이동 실행 취소"
-                  disabled={!skeletonHistoryState.canUndo}
-                  onPress={() => skeletonOverlayRef.current?.undo()}
-                  style={[
-                    styles.overlayIconButton,
-                    !skeletonHistoryState.canUndo
-                      ? styles.overlayIconButtonDisabled
-                      : null,
-                  ]}
-                >
-                  <Ionicons color="#ffffff" name="arrow-undo" size={19} />
-                </Pressable>
-
-                <Pressable
-                  accessibilityLabel="스켈레톤 이동 다시 실행"
-                  disabled={!skeletonHistoryState.canRedo}
-                  onPress={() => skeletonOverlayRef.current?.redo()}
-                  style={[
-                    styles.overlayIconButton,
-                    !skeletonHistoryState.canRedo
-                      ? styles.overlayIconButtonDisabled
-                      : null,
-                  ]}
-                >
-                  <Ionicons color="#ffffff" name="arrow-redo" size={19} />
-                </Pressable>
-              </>
-            ) : null}
-
-            <Pressable
-              accessibilityLabel="새 벽 사진 촬영"
-              accessibilityState={{
-                disabled: isRouteDetectionNavigationLocked,
-              }}
-              disabled={isRouteDetectionNavigationLocked}
-              onPress={onOpenCamera}
-              style={[
-                styles.overlayIconButton,
-                isRouteDetectionNavigationLocked
-                  ? styles.overlayIconButtonDisabled
-                  : null,
-              ]}
-            >
-              <Ionicons color="#ffffff" name="camera-outline" size={20} />
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="갤러리에서 벽 사진 선택"
-              accessibilityState={{
-                disabled: isRouteDetectionNavigationLocked,
-              }}
-              disabled={isRouteDetectionNavigationLocked}
-              onPress={onOpenLibrary}
-              style={[
-                styles.overlayIconButton,
-                isRouteDetectionNavigationLocked
-                  ? styles.overlayIconButtonDisabled
-                  : null,
-              ]}
-            >
-              <Ionicons color="#ffffff" name="images-outline" size={20} />
-            </Pressable>
-
-            <Pressable
-              accessibilityLabel="현재 벽 사진 삭제"
-              accessibilityState={{
-                disabled: isRouteDetectionNavigationLocked,
-              }}
-              disabled={isRouteDetectionNavigationLocked}
-              onPress={() => setConfirmVisible(true)}
-              style={[
-                styles.overlayIconButton,
-                isRouteDetectionNavigationLocked
-                  ? styles.overlayIconButtonDisabled
-                  : null,
-              ]}
-            >
-              <Ionicons color="#ffffff" name="trash-outline" size={20} />
-            </Pressable>
-          </View>
+          {renderInstructionPanel()}
 
           <Animated.View
             pointerEvents="none"
@@ -1062,44 +1002,12 @@ export function SimulationCanvasStage({
               style={styles.simulationCueText}
             >
               {isClearComplete
-                ? "Clear! 이제 실제 벽에서 시도해보세요."
+                ? "완등! 이제 실제 벽에서 시도해보세요."
                 : "이제 다음 무브를 확인해보세요!"}
             </Text>
           </Animated.View>
 
-          {flowStep === "simulating" && isClearComplete ? (
-            <View pointerEvents="box-none" style={styles.clearActionOverlay}>
-              <View style={styles.clearActionRow}>
-                <Pressable
-                  accessibilityLabel="시뮬레이션 다시 시도"
-                  onPress={handleRetrySimulation}
-                  style={({ pressed }) => [
-                    styles.clearSecondaryButton,
-                    pressed ? styles.clearSecondaryButtonPressed : null,
-                  ]}
-                >
-                  <Text style={styles.clearSecondaryButtonText}>다시 시도</Text>
-                </Pressable>
-
-                <Pressable
-                  accessibilityLabel="시뮬레이션 완료"
-                  onPress={onClearPhoto}
-                  style={({ pressed }) => [
-                    styles.clearPrimaryButton,
-                    pressed ? styles.clearPrimaryButtonPressed : null,
-                  ]}
-                >
-                  <Text style={styles.clearPrimaryButtonText}>완료</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
         </View>
-
-        <BottomTabBar
-          active="simulation"
-          isNavigationLocked={isRouteDetectionNavigationLocked}
-        />
 
         <ConfirmModal
           body="현재 시뮬레이션에 올린 사진이 초기화됩니다."
@@ -1127,43 +1035,48 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brand.colors.wall,
   },
+  canvasChrome: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(37, 29, 21, 0.12)",
+    backgroundColor: brand.colors.wall,
+  },
+  canvasChromeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  canvasHeaderLogo: {
+    alignSelf: "flex-start",
+    width: 124,
+    height: 36,
+  },
   canvasArea: {
     flex: 1,
     overflow: "hidden",
-    backgroundColor: "#0f0f0f",
+    backgroundColor: brand.colors.wall,
   },
-  canvasTopOverlay: {
-    position: "absolute",
-    top: 14,
-    right: 16,
+  canvasChromeActions: {
     flexDirection: "row",
+    flexShrink: 0,
+    marginLeft: "auto",
+    justifyContent: "flex-end",
     gap: 10,
   },
   touchLayer: {
     ...StyleSheet.absoluteFillObject,
   },
-  infoOverlay: {
+  instructionPanelOverlay: {
     position: "absolute",
     left: 14,
     right: 14,
-    top: 68,
-  },
-  infoCard: {
-    alignSelf: "stretch",
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 12,
-    borderRadius: 18,
-    backgroundColor: "rgba(10, 10, 10, 0.58)",
-  },
-  routeEditPanelOverlay: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 18,
+    bottom: 34,
     zIndex: 20,
   },
-  routeEditPanel: {
+  instructionPanel: {
     alignSelf: "stretch",
     paddingHorizontal: 14,
     paddingTop: 11,
@@ -1171,34 +1084,18 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "rgba(10, 10, 10, 0.68)",
   },
-  infoHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  infoEyebrow: {
+  instructionEyebrow: {
     color: brand.colors.accent,
     fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1.2,
   },
-  infoTitle: {
+  instructionTitle: {
     marginTop: 6,
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "800",
-  },
-  statusChip: {
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    backgroundColor: "rgba(255,255,255,0.12)",
-  },
-  statusChipText: {
-    color: brand.colors.accentSoft,
-    fontSize: 11,
-    fontWeight: "700",
+    lineHeight: 21,
   },
   loadingRow: {
     marginTop: 10,
@@ -1236,7 +1133,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
-  analysisFailureActions: {
+  instructionActionRow: {
     marginTop: 10,
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1264,7 +1161,6 @@ const styles = StyleSheet.create({
   },
   reselectButton: {
     alignSelf: "flex-start",
-    marginTop: 10,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1277,22 +1173,6 @@ const styles = StyleSheet.create({
     color: brand.colors.accentSoft,
     fontSize: 12,
     fontWeight: "800",
-  },
-  routeEditHint: {
-    marginTop: 7,
-    color: brand.colors.accentSoft,
-    fontSize: 12,
-    fontWeight: "800",
-    lineHeight: 16,
-  },
-  calibrationActionRow: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  calibrationTextButton: {
-    marginTop: 0,
   },
   calibrationConfirmButton: {
     height: 31,
@@ -1310,38 +1190,6 @@ const styles = StyleSheet.create({
     color: brand.colors.primaryText,
     fontSize: 12,
     fontWeight: "900",
-  },
-  simulationCue: {
-    position: "absolute",
-    top: 92,
-    left: 10,
-    right: 10,
-    alignItems: "center",
-  },
-  simulationCueText: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontWeight: "900",
-    textAlign: "center",
-    textShadowColor: "rgba(0,0,0,0.72)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
-  },
-  clearActionOverlay: {
-    position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 18,
-    alignItems: "center",
-  },
-  clearActionRow: {
-    minHeight: 42,
-    borderRadius: 21,
-    padding: 5,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(10, 10, 10, 0.58)",
   },
   clearSecondaryButton: {
     height: 32,
@@ -1377,15 +1225,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
+  simulationCue: {
+    position: "absolute",
+    top: 92,
+    left: 10,
+    right: 10,
+    alignItems: "center",
+  },
+  simulationCueText: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "900",
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.72)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+  },
   overlayIconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(15, 15, 15, 0.68)",
+    borderWidth: 1,
+    borderColor: "rgba(37, 29, 21, 0.14)",
+    backgroundColor: "rgba(255, 244, 223, 0.24)",
   },
   overlayIconButtonDisabled: {
-    opacity: 0.34,
+    opacity: 0.3,
   },
 });

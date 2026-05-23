@@ -11,6 +11,14 @@ const simulationCanvasSource = new URL(
   "../src/components/SimulationCanvasStage.tsx",
   import.meta.url,
 );
+const simulationAdjustSource = new URL(
+  "../src/components/SimulationAdjustStage.tsx",
+  import.meta.url,
+);
+const simulationPhotoViewportSource = new URL(
+  "../src/components/SimulationPhotoViewport.tsx",
+  import.meta.url,
+);
 const settingsSource = new URL("../app/(tabs)/settings.tsx", import.meta.url);
 const simulationInputSource = new URL(
   "../src/components/SimulationInputStage.tsx",
@@ -108,6 +116,79 @@ test("simulation start screen balances primary action with body context", async 
   assert.doesNotMatch(source, /minHeight: 360/);
 });
 
+test("simulation photo adjustment keeps the photo between fixed chrome areas", async () => {
+  const source = await readFile(simulationAdjustSource, "utf8");
+  const viewportWrapBlock = source.match(/viewportWrap:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const photoLayerBlock = source.match(/photoLayer:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const bottomOverlayBlock =
+    source.match(/adjustBottomOverlay:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+
+  assert.match(source, /resolveAdjustmentTranslations/);
+  assert.match(viewportWrapBlock, /flex: 1/);
+  assert.doesNotMatch(viewportWrapBlock, /StyleSheet\.absoluteFillObject/);
+  assert.match(photoLayerBlock, /StyleSheet\.absoluteFillObject/);
+  assert.doesNotMatch(bottomOverlayBlock, /position: "absolute"/);
+  assert.match(bottomOverlayBlock, /backgroundColor: "#0f0f0f"/);
+});
+
+test("simulation photo adjustment gates vertical dragging behind zoom", async () => {
+  const source = await readFile(simulationAdjustSource, "utf8");
+
+  assert.match(source, /resolveAdjustmentTranslations/);
+  assert.match(source, /event\.translationY/);
+  assert.match(source, /startY/);
+  assert.match(source, /scale\.value > 1/);
+});
+
+test("simulation canvas uses the same fixed photo work area as adjustment", async () => {
+  const source = await readFile(simulationCanvasSource, "utf8");
+  const photoViewportSource = await readFile(simulationPhotoViewportSource, "utf8");
+  const canvasAreaBlock = source.match(/canvasArea:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const photoViewportBlock =
+    photoViewportSource.match(/viewport:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const canvasChromeBlock =
+    source.match(/canvasChrome:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const safeAreaBlock = source.match(/safeArea:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const canvasChromeActionsBlock =
+    source.match(/canvasChromeActions:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const canvasHeaderLogoBlock =
+    source.match(/canvasHeaderLogo:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const instructionPanelOverlayBlock =
+    source.match(/instructionPanelOverlay:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
+
+  assert.match(source, /<SafeAreaView edges=\{\["top"\]\}/);
+  assert.doesNotMatch(source, /<SafeAreaView edges=\{\["top", "bottom"\]\}/);
+  assert.match(source, /const rupaLogo = require\("\.\.\/\.\.\/assets\/rupa-logo\.png"\)/);
+  assert.match(source, /<Image[\s\S]*source=\{rupaLogo\}[\s\S]*style=\{styles\.canvasHeaderLogo\}/);
+  assert.doesNotMatch(source, /Rupa Simulation/);
+  assert.doesNotMatch(source, /<View style=\{styles\.infoCard\}>[\s\S]*<Text style=\{styles\.infoTitle\}>\{infoTitle\}<\/Text>[\s\S]*styles\.canvasChromeActions/);
+  assert.match(source, /function renderInstructionPanel/);
+  assert.match(source, /renderInstructionPanel\(\)/);
+  assert.match(source, /styles\.instructionPanelOverlay/);
+  assert.match(source, /styles\.instructionPanel/);
+  assert.match(source, /const canUseSkeletonHistory = flowStep === "simulating"/);
+  assert.match(canvasAreaBlock, /flex: 1/);
+  assert.doesNotMatch(canvasAreaBlock, /StyleSheet\.absoluteFillObject/);
+  assert.match(canvasAreaBlock, /backgroundColor: brand\.colors\.wall/);
+  assert.match(photoViewportBlock, /backgroundColor: brand\.colors\.wall/);
+  assert.match(safeAreaBlock, /backgroundColor: brand\.colors\.wall/);
+  assert.match(canvasChromeBlock, /backgroundColor: brand\.colors\.wall/);
+  assert.match(canvasHeaderLogoBlock, /alignSelf: "flex-start"/);
+  assert.doesNotMatch(canvasHeaderLogoBlock, /flex: 1/);
+  assert.match(canvasChromeActionsBlock, /flexDirection: "row"/);
+  assert.doesNotMatch(source, /BottomTabBar/);
+  assert.doesNotMatch(source, /styles\.bottomTabOverlay/);
+  assert.match(source, /styles\.simulationCue/);
+  assert.match(source, /Animated\.sequence/);
+  assert.match(source, /case "simulating":[\s\S]*캐릭터를 움직여 무브를 시뮬레이션해보세요\./);
+  assert.doesNotMatch(source, /camera-outline/);
+  assert.doesNotMatch(source, /images-outline/);
+  assert.doesNotMatch(source, /statusChip/);
+  assert.doesNotMatch(source, /name="trash-outline"/);
+  assert.match(source, /name="close"/);
+  assert.match(instructionPanelOverlayBlock, /bottom: 34/);
+});
+
 test("settings screen keeps the profile form visually organized", async () => {
   const source = await readFile(settingsSource, "utf8");
 
@@ -141,9 +222,9 @@ test("bottom tab bar stays compact and avoids the blue accent palette", async ()
 test("simulation canvas icon actions are accessible and large enough to tap", async () => {
   const source = await readFile(simulationCanvasSource, "utf8");
 
-  assert.match(source, /accessibilityLabel="새 벽 사진 촬영"/);
-  assert.match(source, /accessibilityLabel="갤러리에서 벽 사진 선택"/);
-  assert.match(source, /accessibilityLabel="현재 벽 사진 삭제"/);
+  assert.doesNotMatch(source, /accessibilityLabel="새 벽 사진 촬영"/);
+  assert.doesNotMatch(source, /accessibilityLabel="갤러리에서 벽 사진 선택"/);
+  assert.match(source, /accessibilityLabel="현재 벽 사진 닫기"/);
   assert.match(source, /width: 44/);
   assert.match(source, /height: 44/);
 });
