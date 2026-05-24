@@ -749,9 +749,7 @@ export function SimulationCanvasStage({
                   pressed ? styles.reselectButtonPressed : null,
                 ]}
               >
-                <Text style={styles.reselectButtonText}>
-                  스타트 다시 선택
-                </Text>
+                <Text style={styles.reselectButtonText}>스타트 다시 선택</Text>
               </Pressable>
 
               {selectedTopHoldObjectId ? (
@@ -1006,7 +1004,6 @@ export function SimulationCanvasStage({
                 : "이제 다음 무브를 확인해보세요!"}
             </Text>
           </Animated.View>
-
         </View>
 
         <ConfirmModal
@@ -1047,11 +1044,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
   },
   canvasHeaderLogo: {
-    alignSelf: "flex-start",
-    width: 124,
+    width: 78,
     height: 36,
   },
   canvasArea: {
