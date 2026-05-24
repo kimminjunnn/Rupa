@@ -126,9 +126,11 @@ test("simulation photo adjustment matches the canvas photo work area", async () 
 
   assert.match(source, /clampAdjustmentTranslations/);
   assert.match(source, /resolvePhotoLayerFrame/);
-  assert.match(topChromeBlock, /paddingTop: 10/);
-  assert.match(topChromeBlock, /paddingBottom: 10/);
-  assert.match(topChromeBlock, /backgroundColor: brand\.colors\.wall/);
+  assert.match(source, /확대한 뒤 위치를 맞춰보세요\./);
+  assert.match(topChromeBlock, /alignItems: "center"/);
+  assert.match(topChromeBlock, /paddingTop: 12/);
+  assert.match(topChromeBlock, /paddingBottom: 18/);
+  assert.match(topChromeBlock, /backgroundColor: "#0f0f0f"/);
   assert.match(viewportWrapBlock, /flex: 1/);
   assert.doesNotMatch(viewportWrapBlock, /StyleSheet\.absoluteFillObject/);
   assert.match(photoLayerBlock, /position: "absolute"/);

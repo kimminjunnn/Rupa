@@ -193,6 +193,9 @@ export function SimulationAdjustStage({
 
           <View style={styles.adjustTitleWrap}>
             <Text style={styles.adjustTitle}>사진 위치 조정</Text>
+            <Text style={styles.adjustSubtitle}>
+              경로가 모두 보이게 사진 위치를 맞춰주세요.
+            </Text>
           </View>
         </View>
 
@@ -232,22 +235,20 @@ export function SimulationAdjustStage({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: brand.colors.wall,
+    backgroundColor: "#0f0f0f",
   },
   screen: {
     flex: 1,
-    backgroundColor: brand.colors.wall,
+    backgroundColor: "#0f0f0f",
   },
   topChrome: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(37, 29, 21, 0.12)",
-    backgroundColor: brand.colors.wall,
+    paddingTop: 12,
+    paddingBottom: 18,
+    backgroundColor: "#0f0f0f",
   },
   closeButton: {
     alignItems: "center",
@@ -259,12 +260,19 @@ const styles = StyleSheet.create({
   },
   adjustTitleWrap: {
     flex: 1,
+    gap: 4,
   },
   adjustTitle: {
-    color: brand.colors.text,
-    fontSize: 17,
+    color: "#ffffff",
+    fontSize: 20,
     fontWeight: "800",
-    lineHeight: 22,
+    letterSpacing: -0.4,
+  },
+  adjustSubtitle: {
+    color: "rgba(255, 255, 255, 0.78)",
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
   },
   viewportWrap: {
     flex: 1,
