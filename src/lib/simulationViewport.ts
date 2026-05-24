@@ -76,6 +76,33 @@ export function clampTranslations(
   };
 }
 
+export function clampAdjustmentTranslations(
+  translateX: number,
+  translateY: number,
+  scale: number,
+  baseWidth: number,
+  baseHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+) {
+  "worklet";
+
+  const { maxOffsetX, maxOffsetY } = getMaxOffsets(
+    scale,
+    baseWidth,
+    baseHeight,
+    viewportWidth,
+    viewportHeight,
+  );
+  const verticalGuard = Math.min(maxOffsetY, viewportHeight * 0.14);
+  const guardedMaxY = Math.max(0, maxOffsetY - verticalGuard);
+
+  return {
+    x: clampValue(translateX, -maxOffsetX, maxOffsetX),
+    y: clampValue(translateY, -guardedMaxY, guardedMaxY),
+  };
+}
+
 export function resolveAdjustmentTranslations(
   translateX: number,
   translateY: number,

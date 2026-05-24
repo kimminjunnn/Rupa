@@ -1,15 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { Image, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useAnimatedStyle, useSharedValue } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { brand } from "../theme/brand";
 import {
+  clampAdjustmentTranslations,
   clampValue,
   getBaseDimensions,
-  resolveAdjustmentTranslations,
+  resolvePhotoLayerFrame,
   resolveTransformRatios,
 } from "../lib/simulationViewport";
 import type {
@@ -17,6 +31,7 @@ import type {
   SimulationPhotoTransform,
 } from "../types/simulation";
 
+const MIN_ADJUST_SCALE = 1.08;
 const MAX_ADJUST_SCALE = 4;
 
 type SimulationAdjustStageProps = {
@@ -33,19 +48,20 @@ export function SimulationAdjustStage({
   const insets = useSafeAreaInsets();
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
-  const scale = useSharedValue(1);
+  const scale = useSharedValue(MIN_ADJUST_SCALE);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
 
-  const startScale = useSharedValue(1);
+  const startScale = useSharedValue(MIN_ADJUST_SCALE);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
 
   useEffect(() => {
-    scale.value = 1;
+    scale.value = MIN_ADJUST_SCALE;
+    startScale.value = MIN_ADJUST_SCALE;
     translateX.value = 0;
     translateY.value = 0;
-  }, [photo.updatedAt, scale, translateX, translateY]);
+  }, [photo.updatedAt, scale, startScale, translateX, translateY]);
 
   const baseDimensions =
     viewport.width > 0 && viewport.height > 0
@@ -62,7 +78,7 @@ export function SimulationAdjustStage({
         return;
       }
 
-      const clamped = resolveAdjustmentTranslations(
+      const clamped = clampAdjustmentTranslations(
         startX.value + event.translationX,
         startY.value + event.translationY,
         scale.value,
@@ -87,10 +103,10 @@ export function SimulationAdjustStage({
 
       const nextScale = clampValue(
         startScale.value * event.scale,
-        1,
+        MIN_ADJUST_SCALE,
         MAX_ADJUST_SCALE,
       );
-      const clamped = resolveAdjustmentTranslations(
+      const clamped = clampAdjustmentTranslations(
         translateX.value,
         translateY.value,
         nextScale,
@@ -110,7 +126,7 @@ export function SimulationAdjustStage({
       return {};
     }
 
-    const clamped = resolveAdjustmentTranslations(
+    const clamped = clampAdjustmentTranslations(
       translateX.value,
       translateY.value,
       scale.value,
@@ -119,14 +135,17 @@ export function SimulationAdjustStage({
       viewport.width,
       viewport.height,
     );
+    const frame = resolvePhotoLayerFrame(
+      clamped.x,
+      clamped.y,
+      scale.value,
+      baseDimensions.width,
+      baseDimensions.height,
+      viewport.width,
+      viewport.height,
+    );
 
-    return {
-      transform: [
-        { translateX: clamped.x },
-        { translateY: clamped.y },
-        { scale: scale.value },
-      ],
-    };
+    return frame;
   });
 
   function handleViewportLayout(event: LayoutChangeEvent) {
@@ -139,7 +158,7 @@ export function SimulationAdjustStage({
       return;
     }
 
-    const transform = resolveTransformRatios(
+    const clamped = clampAdjustmentTranslations(
       translateX.value,
       translateY.value,
       scale.value,
@@ -148,13 +167,20 @@ export function SimulationAdjustStage({
       viewport.width,
       viewport.height,
     );
-
-    onApply(
-      {
-        ...transform,
-        offsetYRatio: scale.value > 1 ? transform.offsetYRatio : 0,
-      },
+    const transform = resolveTransformRatios(
+      clamped.x,
+      clamped.y,
+      scale.value,
+      baseDimensions.width,
+      baseDimensions.height,
+      viewport.width,
+      viewport.height,
     );
+
+    onApply({
+      ...transform,
+      offsetYRatio: scale.value > 1 ? transform.offsetYRatio : 0,
+    });
   }
 
   return (
@@ -167,14 +193,13 @@ export function SimulationAdjustStage({
 
           <View style={styles.adjustTitleWrap}>
             <Text style={styles.adjustTitle}>사진 위치 조정</Text>
-            <Text style={styles.adjustSubtitle}>
-              확대한 뒤 위치를 맞춰보세요.
-            </Text>
           </View>
         </View>
 
         <View onLayout={handleViewportLayout} style={styles.viewportWrap}>
-          <GestureDetector gesture={Gesture.Simultaneous(panGesture, pinchGesture)}>
+          <GestureDetector
+            gesture={Gesture.Simultaneous(panGesture, pinchGesture)}
+          >
             <View style={styles.viewport}>
               {baseDimensions ? (
                 <Animated.View style={[styles.photoLayer, imageLayerStyle]}>
@@ -207,20 +232,22 @@ export function SimulationAdjustStage({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#0f0f0f",
+    backgroundColor: brand.colors.wall,
   },
   screen: {
     flex: 1,
-    backgroundColor: "#0f0f0f",
+    backgroundColor: brand.colors.wall,
   },
   topChrome: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
+    alignItems: "center",
+    gap: 12,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 18,
-    backgroundColor: "#0f0f0f",
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(37, 29, 21, 0.12)",
+    backgroundColor: brand.colors.wall,
   },
   closeButton: {
     alignItems: "center",
@@ -232,20 +259,12 @@ const styles = StyleSheet.create({
   },
   adjustTitleWrap: {
     flex: 1,
-    gap: 4,
-    paddingTop: 8,
   },
   adjustTitle: {
-    color: "#ffffff",
-    fontSize: 20,
+    color: brand.colors.text,
+    fontSize: 17,
     fontWeight: "800",
-    letterSpacing: -0.4,
-  },
-  adjustSubtitle: {
-    color: "rgba(255, 255, 255, 0.78)",
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "500",
+    lineHeight: 22,
   },
   viewportWrap: {
     flex: 1,
@@ -259,7 +278,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0f0f0f",
   },
   photoLayer: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -269,9 +288,14 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   adjustBottomOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
     paddingHorizontal: 20,
     paddingTop: 18,
-    backgroundColor: "#0f0f0f",
+    backgroundColor: "rgba(15, 15, 15, 0.38)",
   },
   confirmButton: {
     alignItems: "center",

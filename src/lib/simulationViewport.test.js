@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  clampAdjustmentTranslations,
   clampTranslations,
   getBaseDimensions,
   resolveAdjustmentTranslations,
@@ -102,4 +103,30 @@ test("adjustment translation allows dragging only within the zoomed viewport lay
 
   assert.equal(resolved.x, viewport.width / 2);
   assert.equal(resolved.y, viewport.height / 2);
+});
+
+test("adjustment translation keeps vertical photo edges outside the viewport", () => {
+  const viewport = { width: 393, height: 552 };
+  const base = getBaseDimensions(photo, viewport.width, viewport.height);
+  const resolved = clampAdjustmentTranslations(
+    0,
+    10_000,
+    1.5,
+    base.width,
+    base.height,
+    viewport.width,
+    viewport.height,
+  );
+  const normal = clampTranslations(
+    0,
+    10_000,
+    1.5,
+    base.width,
+    base.height,
+    viewport.width,
+    viewport.height,
+  );
+
+  assert.ok(resolved.y < normal.y);
+  assert.ok(resolved.y <= viewport.height * 0.14);
 });

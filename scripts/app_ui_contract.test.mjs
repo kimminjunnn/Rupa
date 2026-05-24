@@ -116,28 +116,49 @@ test("simulation start screen balances primary action with body context", async 
   assert.doesNotMatch(source, /minHeight: 360/);
 });
 
-test("simulation photo adjustment keeps the photo between fixed chrome areas", async () => {
+test("simulation photo adjustment matches the canvas photo work area", async () => {
   const source = await readFile(simulationAdjustSource, "utf8");
+  const topChromeBlock = source.match(/topChrome:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
   const viewportWrapBlock = source.match(/viewportWrap:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
   const photoLayerBlock = source.match(/photoLayer:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
   const bottomOverlayBlock =
     source.match(/adjustBottomOverlay:\s*\{[\s\S]*?\n  \}/)?.[0] ?? "";
 
-  assert.match(source, /resolveAdjustmentTranslations/);
+  assert.match(source, /clampAdjustmentTranslations/);
+  assert.match(source, /resolvePhotoLayerFrame/);
+  assert.match(topChromeBlock, /paddingTop: 10/);
+  assert.match(topChromeBlock, /paddingBottom: 10/);
+  assert.match(topChromeBlock, /backgroundColor: brand\.colors\.wall/);
   assert.match(viewportWrapBlock, /flex: 1/);
   assert.doesNotMatch(viewportWrapBlock, /StyleSheet\.absoluteFillObject/);
-  assert.match(photoLayerBlock, /StyleSheet\.absoluteFillObject/);
-  assert.doesNotMatch(bottomOverlayBlock, /position: "absolute"/);
-  assert.match(bottomOverlayBlock, /backgroundColor: "#0f0f0f"/);
+  assert.match(photoLayerBlock, /position: "absolute"/);
+  assert.doesNotMatch(photoLayerBlock, /StyleSheet\.absoluteFillObject/);
+  assert.match(bottomOverlayBlock, /position: "absolute"/);
+  assert.match(bottomOverlayBlock, /left: 0/);
+  assert.match(bottomOverlayBlock, /right: 0/);
+  assert.match(bottomOverlayBlock, /backgroundColor: "rgba\(15, 15, 15, 0\.38\)"/);
 });
 
 test("simulation photo adjustment gates vertical dragging behind zoom", async () => {
   const source = await readFile(simulationAdjustSource, "utf8");
 
-  assert.match(source, /resolveAdjustmentTranslations/);
+  assert.match(source, /clampAdjustmentTranslations/);
   assert.match(source, /event\.translationY/);
   assert.match(source, /startY/);
   assert.match(source, /scale\.value > 1/);
+});
+
+test("simulation photo adjustment starts slightly zoomed without vertical bias", async () => {
+  const source = await readFile(simulationAdjustSource, "utf8");
+  const resetEffectBlock =
+    source.match(/useEffect\(\(\) => \{[\s\S]*?\n  \}, \[/)?.[0] ?? "";
+
+  assert.match(source, /const MIN_ADJUST_SCALE = 1\.08/);
+  assert.match(source, /scale\.value = MIN_ADJUST_SCALE/);
+  assert.match(source, /startScale\.value = MIN_ADJUST_SCALE/);
+  assert.match(source, /startScale\.value \* event\.scale,\s*MIN_ADJUST_SCALE,/);
+  assert.match(resetEffectBlock, /translateY\.value = 0/);
+  assert.doesNotMatch(resetEffectBlock, /translateY\.value = -/);
 });
 
 test("simulation canvas uses the same fixed photo work area as adjustment", async () => {
