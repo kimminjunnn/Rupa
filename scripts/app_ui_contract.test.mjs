@@ -19,6 +19,10 @@ const simulationPhotoViewportSource = new URL(
   "../src/components/SimulationPhotoViewport.tsx",
   import.meta.url,
 );
+const skeletonPoseOverlaySource = new URL(
+  "../src/components/SkeletonPoseOverlay.tsx",
+  import.meta.url,
+);
 const settingsSource = new URL("../app/(tabs)/settings.tsx", import.meta.url);
 const simulationInputSource = new URL(
   "../src/components/SimulationInputStage.tsx",
@@ -250,6 +254,32 @@ test("simulation canvas icon actions are accessible and large enough to tap", as
   assert.match(source, /accessibilityLabel="현재 벽 사진 닫기"/);
   assert.match(source, /width: 44/);
   assert.match(source, /height: 44/);
+});
+
+test("quadrant core hint appears only while dragging the core", async () => {
+  const source = await readFile(skeletonPoseOverlaySource, "utf8");
+  const quadrantBlock =
+    source.match(
+      /mode === "simulating" && simulationInputMode === "quadrants" \? \([\s\S]*?\n      \) : null/,
+    )?.[0] ?? "";
+
+  assert.match(quadrantBlock, /isQuadrantCoreActive \? \(/);
+  assert.match(quadrantBlock, /몸통/);
+});
+
+test("quadrant limb hint shows only the active touched region", async () => {
+  const source = await readFile(skeletonPoseOverlaySource, "utf8");
+  const quadrantBlock =
+    source.match(
+      /mode === "simulating" && simulationInputMode === "quadrants" \? \([\s\S]*?\n      \) : null/,
+    )?.[0] ?? "";
+
+  assert.match(quadrantBlock, /activeQuadrantEndpoint \? \(/);
+  assert.match(
+    quadrantBlock,
+    /getEndpointShortLabel\(activeQuadrantEndpoint\)/,
+  );
+  assert.doesNotMatch(quadrantBlock, /ENDPOINTS\.map/);
 });
 
 test("simulation canvas selects top hold after route hold adjustment", async () => {

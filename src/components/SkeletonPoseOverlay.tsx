@@ -9,6 +9,7 @@ import {
 import {
   PanResponder,
   StyleSheet,
+  Text,
   View,
   type GestureResponderEvent,
   type PanResponderGestureState,
@@ -40,7 +41,9 @@ import {
   type SkeletonPoseSnapshot,
 } from "../lib/skeletonPoseHistory";
 import {
+  getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
+  isCoreDragStart,
   shouldAllowSkeletonPinchScale,
 } from "../lib/skeletonPoseInteraction";
 import {
@@ -91,6 +94,7 @@ type SkeletonPoseOverlayProps = {
   mode: "calibrating" | "simulating";
   onHistoryStateChange?: (state: SkeletonPoseOverlayHistoryState) => void;
   onPoseChange?: (pose: SkeletonPose) => void;
+  simulationInputMode?: "quadrants" | "handles";
   viewportHeight: number;
   viewportWidth: number;
 };
@@ -147,6 +151,7 @@ const HEAD_PRIORITY_BONUS = 0.62;
 const BODY_PRIORITY_BONUS = 1.18;
 const MAX_DRAG_FRAME_DISTANCE = 22;
 const MIN_DRAG_FRAME_DISTANCE = 10;
+const QUADRANT_CORE_HANDLE_RADIUS = 52;
 
 type SkeletonDragTarget =
   | { kind: "endpoint"; id: SkeletonEndpointName }
@@ -194,6 +199,32 @@ function getEndpointAccessibilityLabel(endpointName: SkeletonEndpointName) {
       return "왼발 이동";
     case "rightFoot":
       return "오른발 이동";
+  }
+}
+
+function getEndpointShortLabel(endpointName: SkeletonEndpointName) {
+  switch (endpointName) {
+    case "leftHand":
+      return "왼손";
+    case "rightHand":
+      return "오른손";
+    case "leftFoot":
+      return "왼발";
+    case "rightFoot":
+      return "오른발";
+  }
+}
+
+function getQuadrantHintPosition(endpointName: SkeletonEndpointName) {
+  switch (endpointName) {
+    case "leftHand":
+      return { left: 0, top: 0 };
+    case "rightHand":
+      return { right: 0, top: 0 };
+    case "leftFoot":
+      return { bottom: 0, left: 0 };
+    case "rightFoot":
+      return { bottom: 0, right: 0 };
   }
 }
 
@@ -299,6 +330,7 @@ export const SkeletonPoseOverlay = forwardRef<
     mode,
     onHistoryStateChange,
     onPoseChange,
+    simulationInputMode = "handles",
     viewportHeight,
     viewportWidth,
   },
@@ -322,6 +354,9 @@ export const SkeletonPoseOverlay = forwardRef<
       canUndo: false,
     });
   const [activeControlId, setActiveControlId] = useState<string | null>(null);
+  const [activeQuadrantEndpoint, setActiveQuadrantEndpoint] =
+    useState<SkeletonEndpointName | null>(null);
+  const [isQuadrantCoreActive, setIsQuadrantCoreActive] = useState(false);
   const shouldShowCharacter =
     mode === "simulating" && characterRenderStyle !== "none";
   const shouldRenderRasterCharacter =
@@ -454,6 +489,8 @@ export const SkeletonPoseOverlay = forwardRef<
     poseRef.current = snapshot.pose;
     setScale(snapshot.scale);
     setPose(snapshot.pose);
+    setActiveQuadrantEndpoint(null);
+    setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
   }
 
@@ -508,6 +545,8 @@ export const SkeletonPoseOverlay = forwardRef<
   }
 
   function beginEndpointDrag(endpointName: SkeletonEndpointName) {
+    setActiveQuadrantEndpoint(null);
+    setIsQuadrantCoreActive(false);
     activeDragModeRef.current = null;
     dragStartPointRef.current = getEndpointPosition(
       poseRef.current,
@@ -516,6 +555,18 @@ export const SkeletonPoseOverlay = forwardRef<
     dragStartPoseRef.current = poseRef.current;
     dragStartSnapshotRef.current = getCurrentSnapshot();
     setActiveDragTarget({ kind: "endpoint", id: endpointName });
+  }
+
+  function beginQuadrantEndpointDrag(point: Point2D) {
+    const endpointName = getQuadrantEndpointName({
+      height: viewportHeight,
+      width: viewportWidth,
+      x: point.x,
+      y: point.y,
+    });
+
+    beginEndpointDrag(endpointName);
+    setActiveQuadrantEndpoint(endpointName);
   }
 
   function beginJointDrag(jointName: SkeletonControlJointName) {
@@ -535,11 +586,30 @@ export const SkeletonPoseOverlay = forwardRef<
   }
 
   function beginBodyDrag() {
+    setActiveQuadrantEndpoint(null);
     activeDragModeRef.current = null;
     dragStartPointRef.current = null;
     dragStartPoseRef.current = poseRef.current;
     dragStartSnapshotRef.current = getCurrentSnapshot();
     setActiveDragTarget({ kind: "body" });
+  }
+
+  function beginQuadrantDrag(point: Point2D) {
+    if (
+      isCoreDragStart({
+        height: viewportHeight,
+        radius: QUADRANT_CORE_HANDLE_RADIUS,
+        width: viewportWidth,
+        x: point.x,
+        y: point.y,
+      })
+    ) {
+      beginBodyDrag();
+      setIsQuadrantCoreActive(true);
+      return;
+    }
+
+    beginQuadrantEndpointDrag(point);
   }
 
   function scaleSkeletonTo(nextScale: number) {
@@ -795,6 +865,8 @@ export const SkeletonPoseOverlay = forwardRef<
     dragStartPointRef.current = null;
     dragStartPoseRef.current = null;
     dragStartSnapshotRef.current = null;
+    setActiveQuadrantEndpoint(null);
+    setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
   }
 
@@ -942,6 +1014,32 @@ export const SkeletonPoseOverlay = forwardRef<
         onPanResponderTerminate: endEndpointDrag,
       }),
     [],
+  );
+
+  const quadrantResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: (event) =>
+          modeRef.current === "simulating" &&
+          simulationInputMode === "quadrants" &&
+          event.nativeEvent.touches.length < 2,
+        onMoveShouldSetPanResponder: (event) =>
+          modeRef.current === "simulating" &&
+          simulationInputMode === "quadrants" &&
+          event.nativeEvent.touches.length < 2,
+        onPanResponderGrant: (event) => {
+          beginQuadrantDrag({
+            x: event.nativeEvent.locationX,
+            y: event.nativeEvent.locationY,
+          });
+        },
+        onPanResponderMove: (_event, gestureState) => {
+          moveActiveDrag(gestureState);
+        },
+        onPanResponderRelease: endEndpointDrag,
+        onPanResponderTerminate: endEndpointDrag,
+      }),
+    [simulationInputMode, viewportHeight, viewportWidth],
   );
 
   const pinchResponder = useMemo(
@@ -1224,6 +1322,47 @@ export const SkeletonPoseOverlay = forwardRef<
         );
       })}
 
+      {mode === "simulating" && simulationInputMode === "quadrants" ? (
+        <View
+          {...quadrantResponder.panHandlers}
+          accessibilityHint="화면 가운데는 몸통, 좌상단은 왼손, 우상단은 오른손, 좌하단은 왼발, 우하단은 오른발을 움직입니다."
+          accessibilityLabel="4분할 손발 드래그"
+          style={styles.quadrantDragLayer}
+        >
+          {isQuadrantCoreActive ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.quadrantCoreHandle,
+                {
+                  borderRadius: QUADRANT_CORE_HANDLE_RADIUS,
+                  height: QUADRANT_CORE_HANDLE_RADIUS * 2,
+                  left: viewportWidth / 2 - QUADRANT_CORE_HANDLE_RADIUS,
+                  top: viewportHeight / 2 - QUADRANT_CORE_HANDLE_RADIUS,
+                  width: QUADRANT_CORE_HANDLE_RADIUS * 2,
+                },
+              ]}
+            >
+              <Text style={styles.quadrantCoreHandleText}>몸통</Text>
+            </View>
+          ) : null}
+
+          {activeQuadrantEndpoint ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.quadrantHintCell,
+                getQuadrantHintPosition(activeQuadrantEndpoint),
+              ]}
+            >
+              <Text style={styles.quadrantHintText}>
+                {getEndpointShortLabel(activeQuadrantEndpoint)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
     </View>
   );
 });
@@ -1246,5 +1385,41 @@ const styles = StyleSheet.create({
   },
   bodyHitArea: {
     position: "absolute",
+  },
+  quadrantDragLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  quadrantCoreHandle: {
+    position: "absolute",
+    zIndex: 2,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,179,122,0.9)",
+    backgroundColor: "rgba(255,179,122,0.2)",
+  },
+  quadrantCoreHandleText: {
+    color: "#ffb37a",
+    fontSize: 16,
+    fontWeight: "900",
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  quadrantHintCell: {
+    position: "absolute",
+    width: "50%",
+    height: "50%",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,179,122,0.16)",
+  },
+  quadrantHintText: {
+    color: "#ffb37a",
+    fontSize: 16,
+    fontWeight: "900",
+    textShadowColor: "rgba(0,0,0,0.6)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
 });

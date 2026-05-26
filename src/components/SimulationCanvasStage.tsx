@@ -63,6 +63,8 @@ type CanvasFlowStep =
   | "sizingSkeleton"
   | "simulating";
 
+type SimulationInputMode = "quadrants" | "handles";
+
 export function SimulationCanvasStage({
   photo,
   transform,
@@ -86,6 +88,8 @@ export function SimulationCanvasStage({
   const [flowStep, setFlowStep] = useState<CanvasFlowStep>("analyzingHolds");
   const [analysisAttempt, setAnalysisAttempt] = useState(0);
   const [simulationAttempt, setSimulationAttempt] = useState(0);
+  const [simulationInputMode, setSimulationInputMode] =
+    useState<SimulationInputMode>("quadrants");
   const simulationCueOpacity = useRef(new Animated.Value(0)).current;
   const simulationCueTranslateY = useRef(new Animated.Value(18)).current;
   const simulationCueScale = useRef(new Animated.Value(0.92)).current;
@@ -213,6 +217,12 @@ export function SimulationCanvasStage({
     simulationCueScale,
     simulationCueTranslateY,
   ]);
+
+  useEffect(() => {
+    if (flowStep === "simulating") {
+      setSimulationInputMode("quadrants");
+    }
+  }, [flowStep]);
 
   function getDistanceSquared(a: Point2D, b: Point2D) {
     const x = a.x - b.x;
@@ -509,6 +519,12 @@ export function SimulationCanvasStage({
     setIsClearComplete(false);
     setFlowStep("simulating");
     setSimulationAttempt((currentAttempt) => currentAttempt + 1);
+  }
+
+  function toggleSimulationInputMode() {
+    setSimulationInputMode((currentMode) =>
+      currentMode === "quadrants" ? "handles" : "quadrants",
+    );
   }
 
   const holdCount = analysisResult
@@ -846,6 +862,37 @@ export function SimulationCanvasStage({
             />
 
             <View style={styles.canvasChromeActions}>
+              {flowStep === "simulating" ? (
+                <Pressable
+                  accessibilityLabel={
+                    simulationInputMode === "quadrants"
+                      ? "핸들 조작으로 전환"
+                      : "4분할 조작으로 전환"
+                  }
+                  accessibilityState={{
+                    selected: simulationInputMode === "quadrants",
+                  }}
+                  onPress={toggleSimulationInputMode}
+                  style={({ pressed }) => [
+                    styles.overlayIconButton,
+                    simulationInputMode === "quadrants"
+                      ? styles.overlayIconButtonActive
+                      : null,
+                    pressed ? styles.overlayIconButtonPressed : null,
+                  ]}
+                >
+                  <Ionicons
+                    color={brand.colors.text}
+                    name={
+                      simulationInputMode === "quadrants"
+                        ? "grid"
+                        : "hand-left-outline"
+                    }
+                    size={19}
+                  />
+                </Pressable>
+              ) : null}
+
               <Pressable
                 accessibilityLabel="스켈레톤 이동 실행 취소"
                 disabled={
@@ -973,6 +1020,7 @@ export function SimulationCanvasStage({
               }
               onHistoryStateChange={setSkeletonHistoryState}
               onPoseChange={handleSkeletonPoseChange}
+              simulationInputMode={simulationInputMode}
               viewportHeight={viewport.height}
               viewportWidth={viewport.width}
             />
@@ -1245,6 +1293,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(37, 29, 21, 0.14)",
     backgroundColor: "rgba(255, 244, 223, 0.24)",
+  },
+  overlayIconButtonActive: {
+    borderColor: "rgba(37, 29, 21, 0.3)",
+    backgroundColor: "rgba(255, 179, 122, 0.62)",
+  },
+  overlayIconButtonPressed: {
+    opacity: 0.72,
   },
   overlayIconButtonDisabled: {
     opacity: 0.3,
