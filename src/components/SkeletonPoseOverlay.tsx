@@ -7,9 +7,9 @@ import {
   useState,
 } from "react";
 import {
+  Image,
   PanResponder,
   StyleSheet,
-  Text,
   View,
   type GestureResponderEvent,
   type PanResponderGestureState,
@@ -153,6 +153,14 @@ const MAX_DRAG_FRAME_DISTANCE = 22;
 const MIN_DRAG_FRAME_DISTANCE = 10;
 const QUADRANT_CORE_HANDLE_RADIUS = 52;
 
+const quadrantCoreIcon = require("../../assets/quadrant-controls/core.png");
+const quadrantEndpointIcons: Record<SkeletonEndpointName, number> = {
+  leftFoot: require("../../assets/quadrant-controls/left-foot.png"),
+  leftHand: require("../../assets/quadrant-controls/left-hand.png"),
+  rightFoot: require("../../assets/quadrant-controls/right-foot.png"),
+  rightHand: require("../../assets/quadrant-controls/right-hand.png"),
+};
+
 type SkeletonDragTarget =
   | { kind: "endpoint"; id: SkeletonEndpointName }
   | { kind: "joint"; id: SkeletonControlJointName }
@@ -202,19 +210,6 @@ function getEndpointAccessibilityLabel(endpointName: SkeletonEndpointName) {
   }
 }
 
-function getEndpointShortLabel(endpointName: SkeletonEndpointName) {
-  switch (endpointName) {
-    case "leftHand":
-      return "왼손";
-    case "rightHand":
-      return "오른손";
-    case "leftFoot":
-      return "왼발";
-    case "rightFoot":
-      return "오른발";
-  }
-}
-
 function getQuadrantHintPosition(endpointName: SkeletonEndpointName) {
   switch (endpointName) {
     case "leftHand":
@@ -226,6 +221,10 @@ function getQuadrantHintPosition(endpointName: SkeletonEndpointName) {
     case "rightFoot":
       return { bottom: 0, right: 0 };
   }
+}
+
+function getQuadrantEndpointIcon(endpointName: SkeletonEndpointName) {
+  return quadrantEndpointIcons[endpointName];
 }
 
 function getJointAccessibilityLabel(jointName: SkeletonControlJointName) {
@@ -948,7 +947,10 @@ export const SkeletonPoseOverlay = forwardRef<
 
           return responders;
         },
-        {} as Record<SkeletonEndpointName, ReturnType<typeof PanResponder.create>>,
+        {} as Record<
+          SkeletonEndpointName,
+          ReturnType<typeof PanResponder.create>
+        >,
       ),
     [],
   );
@@ -1058,9 +1060,7 @@ export const SkeletonPoseOverlay = forwardRef<
   return (
     <View
       {...pinchResponder.panHandlers}
-      pointerEvents={getSkeletonOverlayPointerEvents(
-        allowEmptySpacePinchScale,
-      )}
+      pointerEvents={getSkeletonOverlayPointerEvents(allowEmptySpacePinchScale)}
       style={styles.overlay}
     >
       {shouldRenderRasterCharacter ? (
@@ -1129,9 +1129,7 @@ export const SkeletonPoseOverlay = forwardRef<
             cx={skeletonCenter.x}
             cy={skeletonCenter.y}
             fill={
-              activeControlId === "body"
-                ? "#ffb37a"
-                : "rgba(122,214,255,0.74)"
+              activeControlId === "body" ? "#ffb37a" : "rgba(122,214,255,0.74)"
             }
             opacity={
               activeControlId === "body" && !shouldShowCharacter
@@ -1343,7 +1341,14 @@ export const SkeletonPoseOverlay = forwardRef<
                 },
               ]}
             >
-              <Text style={styles.quadrantCoreHandleText}>몸통</Text>
+              <View style={styles.quadrantControlBadge}>
+                <Image
+                  accessibilityIgnoresInvertColors
+                  resizeMode="contain"
+                  source={quadrantCoreIcon}
+                  style={styles.quadrantControlIcon}
+                />
+              </View>
             </View>
           ) : null}
 
@@ -1355,14 +1360,18 @@ export const SkeletonPoseOverlay = forwardRef<
                 getQuadrantHintPosition(activeQuadrantEndpoint),
               ]}
             >
-              <Text style={styles.quadrantHintText}>
-                {getEndpointShortLabel(activeQuadrantEndpoint)}
-              </Text>
+              <View style={styles.quadrantControlBadge}>
+                <Image
+                  accessibilityIgnoresInvertColors
+                  resizeMode="contain"
+                  source={getQuadrantEndpointIcon(activeQuadrantEndpoint)}
+                  style={styles.quadrantControlIcon}
+                />
+              </View>
             </View>
           ) : null}
         </View>
       ) : null}
-
     </View>
   );
 });
@@ -1395,16 +1404,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,179,122,0.9)",
-    backgroundColor: "rgba(255,179,122,0.2)",
-  },
-  quadrantCoreHandleText: {
-    color: "#ffb37a",
-    fontSize: 16,
-    fontWeight: "900",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+    borderColor: "rgba(255,179,122,0.46)",
+    backgroundColor: "rgba(255,179,122,0.07)",
   },
   quadrantHintCell: {
     position: "absolute",
@@ -1412,14 +1413,21 @@ const styles = StyleSheet.create({
     height: "50%",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,179,122,0.16)",
+    backgroundColor: "rgba(255,179,122,0.07)",
   },
-  quadrantHintText: {
-    color: "#ffb37a",
-    fontSize: 16,
-    fontWeight: "900",
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
+  quadrantControlBadge: {
+    width: 86,
+    height: 86,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,179,122,0.46)",
+    backgroundColor: "rgba(18,16,14,0.38)",
+  },
+  quadrantControlIcon: {
+    width: 66,
+    height: 66,
+    opacity: 0.55,
   },
 });

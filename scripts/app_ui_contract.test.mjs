@@ -264,7 +264,9 @@ test("quadrant core hint appears only while dragging the core", async () => {
     )?.[0] ?? "";
 
   assert.match(quadrantBlock, /isQuadrantCoreActive \? \(/);
-  assert.match(quadrantBlock, /몸통/);
+  assert.match(source, /quadrantCoreIcon/);
+  assert.match(source, /assets\/quadrant-controls\/core\.png/);
+  assert.doesNotMatch(quadrantBlock, /<Text[\s\S]*몸통[\s\S]*<\/Text>/);
 });
 
 test("quadrant limb hint shows only the active touched region", async () => {
@@ -275,11 +277,22 @@ test("quadrant limb hint shows only the active touched region", async () => {
     )?.[0] ?? "";
 
   assert.match(quadrantBlock, /activeQuadrantEndpoint \? \(/);
-  assert.match(
-    quadrantBlock,
-    /getEndpointShortLabel\(activeQuadrantEndpoint\)/,
-  );
+  assert.match(quadrantBlock, /Image/);
+  assert.match(quadrantBlock, /getQuadrantEndpointIcon\(activeQuadrantEndpoint\)/);
+  assert.match(source, /assets\/quadrant-controls\/left-hand\.png/);
+  assert.match(source, /assets\/quadrant-controls\/right-hand\.png/);
+  assert.match(source, /assets\/quadrant-controls\/left-foot\.png/);
+  assert.match(source, /assets\/quadrant-controls\/right-foot\.png/);
   assert.doesNotMatch(quadrantBlock, /ENDPOINTS\.map/);
+});
+
+test("quadrant icon hints stay translucent over wall photos", async () => {
+  const source = await readFile(skeletonPoseOverlaySource, "utf8");
+
+  assert.match(source, /backgroundColor: "rgba\(255,179,122,0\.07\)"/);
+  assert.match(source, /backgroundColor: "rgba\(18,16,14,0\.38\)"/);
+  assert.match(source, /borderColor: "rgba\(255,179,122,0\.46\)"/);
+  assert.match(source, /opacity: 0\.68/);
 });
 
 test("simulation canvas selects top hold after route hold adjustment", async () => {
