@@ -14,7 +14,6 @@
       "backgroundColor": "#f7f0e6"
     },
     "ios": {
-      "buildNumber": "2",
       "supportsTablet": false,
       "infoPlist": {
         "NSPhotoLibraryAddUsageDescription": "시뮬레이션에 사용할 사진을 관리하려면 사진 접근이 필요합니다.",
