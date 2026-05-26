@@ -663,7 +663,7 @@ export function SimulationCanvasStage({
   const infoTitle = (() => {
     switch (flowStep) {
       case "analyzingHolds":
-        return "벽 사진에서 홀드 테두리를 찾고 있어요.";
+        return "벽에서 홀드를 찾고 있어요.";
       case "selectingStartHold":
         if (!analysisResult) {
           return "분석 결과를 불러오지 못했어요.";
@@ -686,7 +686,7 @@ export function SimulationCanvasStage({
   })();
 
   const loadingText = isAnalyzingHolds
-    ? "벽 사진을 분석하고 있어요"
+    ? "사진을 분석하고 있어요"
     : "같은 색 홀드를 묶고 있어요";
 
   function renderInstructionPanel() {
