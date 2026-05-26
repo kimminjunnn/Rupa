@@ -59,4 +59,28 @@ describe("VisionClientService", () => {
     expect((file as File).type).toBe("image/jpeg");
     expect(await (file as File).text()).toBe("wall");
   });
+
+  it("logs wall analysis timeout context before returning a gateway timeout", async () => {
+    const timeoutError = Object.assign(new Error("timeout"), { code: "ECONNABORTED" });
+    const post = jest.fn().mockRejectedValue(timeoutError);
+    jest.spyOn(axios, "create").mockReturnValue({ post } as never);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    const service = new VisionClientService();
+
+    await expect(
+      service.analyzeWall({
+        filename: "busy-wall.jpg",
+        mimetype: "image/jpeg",
+        buffer: Buffer.from("wall"),
+      }),
+    ).rejects.toThrow("벽 분석 시간이 초과되었습니다.");
+
+    expect(error).toHaveBeenCalledWith("vision_wall_analysis_timeout", {
+      filename: "busy-wall.jpg",
+      mimetype: "image/jpeg",
+      bytes: 4,
+      timeoutMs: 60000,
+      elapsedMs: expect.any(Number),
+    });
+  });
 });

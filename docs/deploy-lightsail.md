@@ -75,6 +75,9 @@ Check `.env`:
 RUPA_MODEL_DIR=/opt/rupa/models
 NEST_API_PORT=3000
 VISION_SERVICE_TIMEOUT_MS=60000
+RUPA_ANALYSIS_MAX_LONG_EDGE=1280
+RUPA_YOLO_IMAGE_SIZE=640
+RUPA_YOLO_RETINA_MASKS=false
 ```
 
 For 2GB instances, add swap before running YOLO. It gives Linux disk-backed
@@ -124,9 +127,9 @@ curl -sS -w '\nHTTP_STATUS:%{http_code}\n' \
 Expected: `HTTP_STATUS:201`.
 
 If the app receives `504`, Nest timed out while waiting for YOLO. Check
-`VISION_SERVICE_TIMEOUT_MS` and the `vision-service` logs. If the app receives
-`502`, check `docker compose logs vision-service` for the logged inference
-error.
+`VISION_SERVICE_TIMEOUT_MS`, `RUPA_ANALYSIS_MAX_LONG_EDGE`, `RUPA_YOLO_IMAGE_SIZE`,
+and the `vision-service` logs. If the app receives `502`, check
+`docker compose logs vision-service` for the logged inference error.
 
 ## 7. Expo API URL
 

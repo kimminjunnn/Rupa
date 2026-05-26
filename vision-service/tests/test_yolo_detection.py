@@ -1,9 +1,10 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import numpy as np
 
-from app.yolo_provider import _clean_contour_points, yolo_results_to_response
+from app.yolo_provider import _clean_contour_points, infer_wall_objects_with_yolo, yolo_results_to_response
 
 
 class YoloDetectionTests(unittest.TestCase):
@@ -105,6 +106,25 @@ class YoloDetectionTests(unittest.TestCase):
 
         hold = next(obj for obj in response.objects if obj.kind == "hold")
         self.assertEqual(hold.parentVolumeObjectId, "obj_volume_01")
+
+    def test_predict_uses_fast_defaults_for_wall_analysis(self):
+        image = np.zeros((100, 100, 3), dtype=np.uint8)
+        model = Mock()
+        model.predict.return_value = []
+
+        with (
+            patch("app.yolo_provider._model_path_from_env", return_value="/tmp/model.pt"),
+            patch("app.yolo_provider._load_yolo_model", return_value=model),
+        ):
+            infer_wall_objects_with_yolo(image)
+
+        model.predict.assert_called_once_with(
+            image,
+            imgsz=640,
+            conf=0.5,
+            retina_masks=False,
+            verbose=False,
+        )
 
 
 if __name__ == "__main__":

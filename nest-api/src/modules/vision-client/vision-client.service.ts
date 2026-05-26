@@ -44,6 +44,7 @@ export class VisionClientService {
   });
 
   async analyzeWall(input: VisionAnalyzeInput): Promise<VisionAnalyzeResponse> {
+    const startedAt = Date.now();
     const formData = new FormData();
     formData.append(
       "file",
@@ -69,6 +70,13 @@ export class VisionClientService {
       }
 
       if (error.code === "ECONNABORTED") {
+        console.error("vision_wall_analysis_timeout", {
+          filename: input.filename,
+          mimetype: input.mimetype,
+          bytes: input.buffer.byteLength,
+          timeoutMs: visionServiceTimeoutMs(),
+          elapsedMs: Date.now() - startedAt,
+        });
         throw new GatewayTimeoutException("벽 분석 시간이 초과되었습니다.");
       }
 

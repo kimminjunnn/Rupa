@@ -22,6 +22,10 @@ from app.detection_utils import (
 from app.schemas import AnalyzeWallResponse, DetectedWallObject, ImageMeta, Point
 
 MODEL_PATH_ENV = "RUPA_WALL_MODEL_PATH"
+YOLO_IMAGE_SIZE_ENV = "RUPA_YOLO_IMAGE_SIZE"
+YOLO_RETINA_MASKS_ENV = "RUPA_YOLO_RETINA_MASKS"
+DEFAULT_YOLO_IMAGE_SIZE = 640
+DEFAULT_YOLO_RETINA_MASKS = False
 
 
 def _point_from_xy(x: float, y: float, width: int, height: int) -> Point:
@@ -145,6 +149,29 @@ def _model_path_from_env() -> Path:
     return path
 
 
+def _yolo_image_size_from_env() -> int:
+    load_detection_env()
+    raw_value = os.environ.get(YOLO_IMAGE_SIZE_ENV)
+    if raw_value is None:
+        return DEFAULT_YOLO_IMAGE_SIZE
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return DEFAULT_YOLO_IMAGE_SIZE
+
+    return value if value > 0 else DEFAULT_YOLO_IMAGE_SIZE
+
+
+def _yolo_retina_masks_from_env() -> bool:
+    load_detection_env()
+    raw_value = os.environ.get(YOLO_RETINA_MASKS_ENV)
+    if raw_value is None:
+        return DEFAULT_YOLO_RETINA_MASKS
+
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @lru_cache(maxsize=1)
 def _load_yolo_model(model_path: str):
     try:
@@ -226,9 +253,9 @@ def infer_wall_objects_with_yolo(
     try:
         results = model.predict(
             image,
-            imgsz=960,
+            imgsz=_yolo_image_size_from_env(),
             conf=confidence_threshold,
-            retina_masks=True,
+            retina_masks=_yolo_retina_masks_from_env(),
             verbose=False,
         )
     except Exception as error:

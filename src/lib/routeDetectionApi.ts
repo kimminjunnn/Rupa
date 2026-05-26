@@ -8,6 +8,25 @@ const WALL_API_BASE_URL =
   process.env.EXPO_PUBLIC_WALL_API_URL?.replace(/\/$/, "") ??
   "http://localhost:3000";
 
+type RouteDetectionApiOperation = "createWallAnalysis" | "selectDetectedRoute";
+
+type RouteDetectionApiContext = {
+  operation: RouteDetectionApiOperation;
+  requestUrl: string;
+};
+
+function logRouteDetectionApiRequestFailure(
+  operation: RouteDetectionApiOperation,
+  requestUrl: string,
+  error: unknown,
+) {
+  console.error("route_detection_api_request_failed", {
+    operation,
+    url: requestUrl,
+    error,
+  });
+}
+
 function buildFilePayload(photo: SimulationPhoto) {
   const filename =
     photo.uri.split("/").pop() || `wall-photo-${photo.updatedAt}.jpg`;
@@ -26,7 +45,10 @@ function buildFilePayload(photo: SimulationPhoto) {
   };
 }
 
-async function parseJsonResponse<T>(response: Response): Promise<T> {
+async function parseJsonResponse<T>(
+  response: Response,
+  context: RouteDetectionApiContext,
+): Promise<T> {
   const payload = (await response.json().catch(() => null)) as
     | T
     | { error?: { message?: string } }
@@ -38,6 +60,14 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
 
   if (!response.ok) {
     const message = errorPayload?.message || "서버 요청에 실패했습니다.";
+
+    console.error("route_detection_api_failed", {
+      operation: context.operation,
+      url: context.requestUrl,
+      status: response.status,
+      statusText: response.statusText,
+      payload,
+    });
 
     throw new Error(message);
   }
@@ -53,13 +83,20 @@ export async function createWallAnalysis(
   formData.append("file", buildFilePayload(photo) as never);
   const requestUrl = `${WALL_API_BASE_URL}/api/v1/wall-analyses`;
 
-  const response = await fetch(requestUrl, {
-    method: "POST",
-    body: formData,
-  });
+  let response: Response;
+  try {
+    response = await fetch(requestUrl, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    logRouteDetectionApiRequestFailure("createWallAnalysis", requestUrl, error);
+    throw error;
+  }
 
   const payload = await parseJsonResponse<{ analysis: WallAnalysisResult }>(
     response,
+    { operation: "createWallAnalysis", requestUrl },
   );
 
   return payload.analysis;
@@ -72,16 +109,23 @@ export async function selectDetectedRoute(params: {
   const { analysisId, startHoldObjectId } = params;
   const requestUrl = `${WALL_API_BASE_URL}/api/v1/wall-analyses/${analysisId}/route`;
 
-  const response = await fetch(requestUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ startHoldObjectId }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(requestUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ startHoldObjectId }),
+    });
+  } catch (error) {
+    logRouteDetectionApiRequestFailure("selectDetectedRoute", requestUrl, error);
+    throw error;
+  }
 
   const payload = await parseJsonResponse<{ route: RouteSelectionResult }>(
     response,
+    { operation: "selectDetectedRoute", requestUrl },
   );
   return payload.route;
 }

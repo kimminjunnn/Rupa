@@ -36,6 +36,10 @@ const routeHighlightOverlaySource = new URL(
   "../src/components/RouteHighlightOverlay.tsx",
   import.meta.url,
 );
+const routeDetectionApiSource = new URL(
+  "../src/lib/routeDetectionApi.ts",
+  import.meta.url,
+);
 const homeGlassCardSource = new URL(
   "../src/components/HomeGlassCard.tsx",
   import.meta.url,
@@ -50,6 +54,16 @@ test("home screen keeps internal skeleton lab out of the user entry flow", async
 
   assert.doesNotMatch(source, /skeleton-lab/);
   assert.doesNotMatch(source, /스켈레톤 테스트/);
+});
+
+test("route detection API logs failure context to the console", async () => {
+  const source = await readFile(routeDetectionApiSource, "utf8");
+
+  assert.match(source, /console\.error\("route_detection_api_failed"/);
+  assert.match(source, /status:\s*response\.status/);
+  assert.match(source, /url:\s*requestUrl/);
+  assert.match(source, /payload/);
+  assert.match(source, /console\.error\("route_detection_api_request_failed"/);
 });
 
 test("home hero image extends behind top and bottom safe areas", async () => {

@@ -31,6 +31,9 @@ services:
     environment:
       RUPA_WALL_DETECTION_PROVIDER: yolo
       RUPA_WALL_MODEL_PATH: /models/best.pt
+      RUPA_ANALYSIS_MAX_LONG_EDGE: ${RUPA_ANALYSIS_MAX_LONG_EDGE:-1280}
+      RUPA_YOLO_IMAGE_SIZE: ${RUPA_YOLO_IMAGE_SIZE:-640}
+      RUPA_YOLO_RETINA_MASKS: ${RUPA_YOLO_RETINA_MASKS:-false}
     volumes:
       - "${RUPA_MODEL_DIR:-/opt/rupa/models}:/models:ro"
     ports:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import urllib.request
 
@@ -8,6 +9,38 @@ import numpy as np
 import pillow_heif
 
 from app.schemas import AnalyzeWallRequest
+
+MAX_LONG_EDGE_ENV = "RUPA_ANALYSIS_MAX_LONG_EDGE"
+DEFAULT_MAX_LONG_EDGE = 1280
+
+
+def _analysis_max_long_edge() -> int:
+    raw_value = os.environ.get(MAX_LONG_EDGE_ENV)
+    if raw_value is None:
+        return DEFAULT_MAX_LONG_EDGE
+
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return DEFAULT_MAX_LONG_EDGE
+
+    return value if value > 0 else DEFAULT_MAX_LONG_EDGE
+
+
+def _resize_for_analysis(image: np.ndarray, max_long_edge: int) -> np.ndarray:
+    height, width = image.shape[:2]
+    long_edge = max(width, height)
+    if long_edge <= max_long_edge:
+        return image
+
+    scale = max_long_edge / long_edge
+    resized_width = max(1, round(width * scale))
+    resized_height = max(1, round(height * scale))
+    return cv2.resize(
+        image,
+        (resized_width, resized_height),
+        interpolation=cv2.INTER_AREA,
+    )
 
 
 def _decode_heif_payload(payload: bytes) -> np.ndarray:
@@ -41,7 +74,7 @@ def load_image_payload(filename: str, payload: bytes) -> np.ndarray:
     image = _decode_image_payload(payload, is_heif=_is_heif_path(filename))
     if image is None:
         raise ValueError("image_not_readable:upload")
-    return image
+    return _resize_for_analysis(image, _analysis_max_long_edge())
 
 
 def load_image(request: AnalyzeWallRequest) -> np.ndarray:
