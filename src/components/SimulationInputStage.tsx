@@ -11,11 +11,13 @@ import { brand } from "../theme/brand";
 type SimulationInputStageProps = {
   onOpenCamera: () => void;
   onOpenLibrary: () => void;
+  onOpenMenu: () => void;
 };
 
 export function SimulationInputStage({
   onOpenCamera,
   onOpenLibrary,
+  onOpenMenu,
 }: SimulationInputStageProps) {
   const router = useRouter();
   const { hasBodyProfile, profile } = useBodyProfileStore();
@@ -36,6 +38,16 @@ export function SimulationInputStage({
           showsVerticalScrollIndicator={false}
           style={styles.scrollView}
         >
+          <View style={styles.topActionRow}>
+            <Pressable
+              accessibilityLabel="시뮬레이션 메뉴 열기"
+              onPress={onOpenMenu}
+              style={styles.menuButton}
+            >
+              <Ionicons color={brand.colors.text} name="menu" size={24} />
+            </Pressable>
+          </View>
+
           <View style={styles.heroCopy}>
             <Text style={styles.heroEyebrow}>Rupa</Text>
             <Text style={styles.heroTitle}>새 시뮬레이션</Text>
@@ -144,6 +156,20 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 4,
     paddingBottom: 2,
+  },
+  topActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  menuButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 46,
+    height: 46,
+    borderWidth: 1,
+    borderColor: "rgba(37, 29, 21, 0.14)",
+    borderRadius: 23,
+    backgroundColor: "rgba(255, 244, 223, 0.52)",
   },
   heroEyebrow: {
     color: brand.colors.inactive,

@@ -14,6 +14,11 @@ export function getQuadrantEndpointName(input: {
   y: number;
 }): "leftHand" | "rightHand" | "leftFoot" | "rightFoot";
 
+export function isQuadrantEndpointAllowed(input: {
+  allowedEndpointName: "leftHand" | "rightHand" | "leftFoot" | "rightFoot" | null;
+  endpointName: "leftHand" | "rightHand" | "leftFoot" | "rightFoot";
+}): boolean;
+
 export function isCoreDragStart(input: {
   width: number;
   height: number;

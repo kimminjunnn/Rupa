@@ -5,6 +5,7 @@ const test = require("node:test");
 
 const {
   createDefaultSkeletonPose,
+  createStandingSkeletonPose,
   resolveSkeletonCoreDrag,
   resolveSkeletonHeadDrag,
   resolveSkeletonJointDrag,
@@ -45,6 +46,40 @@ test("places the default head at the model head-neck distance", () => {
   );
   assert.equal(pose.joints.head.x, pose.joints.neck.x);
   assert.equal(pose.joints.head.y, pose.joints.neck.y - model.headToNeck);
+});
+
+test("creates a standing tutorial pose with lowered arms and planted feet", () => {
+  const model = {
+    height: 170,
+    wingspan: 172,
+    scale: 0.72,
+    headRadius: 10,
+    headToNeck: 22,
+    neckToTorso: 10,
+    torsoToPelvis: 42,
+    shoulderWidth: 42,
+    hipWidth: 30,
+    upperArm: 38,
+    forearm: 36,
+    thigh: 54,
+    shin: 58,
+  };
+  const pose = createStandingSkeletonPose(model, 400, 700);
+
+  assert.ok(pose.joints.leftHand.y > pose.joints.leftShoulder.y);
+  assert.ok(pose.joints.rightHand.y > pose.joints.rightShoulder.y);
+  assert.ok(pose.joints.leftElbow.y > pose.joints.leftShoulder.y);
+  assert.ok(pose.joints.leftHand.y > pose.joints.leftElbow.y);
+  assert.ok(pose.joints.rightElbow.y > pose.joints.rightShoulder.y);
+  assert.ok(pose.joints.rightHand.y > pose.joints.rightElbow.y);
+  assert.ok(pose.joints.leftKnee.y > pose.joints.leftHip.y);
+  assert.ok(pose.joints.leftFoot.y > pose.joints.leftKnee.y);
+  assert.ok(pose.joints.rightKnee.y > pose.joints.rightHip.y);
+  assert.ok(pose.joints.rightFoot.y > pose.joints.rightKnee.y);
+  assert.ok(pose.joints.leftFoot.x < pose.joints.leftHip.x);
+  assert.ok(pose.joints.rightFoot.x > pose.joints.rightHip.x);
+  assert.ok(pose.joints.leftFoot.y > pose.joints.pelvis.y);
+  assert.ok(pose.joints.rightFoot.y > pose.joints.pelvis.y);
 });
 
 test("limits every skeleton joint to the requested per-frame movement", () => {

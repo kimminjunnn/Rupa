@@ -4,6 +4,7 @@ const test = require("node:test");
 const {
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
+  isQuadrantEndpointAllowed,
   isCoreDragStart,
   shouldAllowSkeletonPinchScale,
 } = require("./skeletonPoseInteraction.js");
@@ -34,6 +35,30 @@ test("selects limb endpoints from screen quadrants", () => {
   assert.equal(
     getQuadrantEndpointName({ ...viewport, x: 390, y: 790 }),
     "rightFoot",
+  );
+});
+
+test("allows only the requested tutorial endpoint when a quadrant is constrained", () => {
+  assert.equal(
+    isQuadrantEndpointAllowed({
+      allowedEndpointName: "leftHand",
+      endpointName: "leftHand",
+    }),
+    true,
+  );
+  assert.equal(
+    isQuadrantEndpointAllowed({
+      allowedEndpointName: "leftHand",
+      endpointName: "rightHand",
+    }),
+    false,
+  );
+  assert.equal(
+    isQuadrantEndpointAllowed({
+      allowedEndpointName: null,
+      endpointName: "rightFoot",
+    }),
+    true,
   );
 });
 

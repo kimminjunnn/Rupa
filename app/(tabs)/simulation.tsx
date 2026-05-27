@@ -1,9 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
+import { useState } from "react";
 import { Alert, Image } from "react-native";
 
 import { SimulationAdjustStage } from "../../src/components/SimulationAdjustStage";
 import { SimulationCanvasStage } from "../../src/components/SimulationCanvasStage";
 import { SimulationInputStage } from "../../src/components/SimulationInputStage";
+import { SimulationMenuDrawer } from "../../src/components/SimulationMenuDrawer";
 import {
   resolveReliablePhotoDimensions,
   type PhotoDimensions,
@@ -54,6 +56,7 @@ export default function SimulationScreen() {
   const applyTransform = useSimulationStore((state) => state.applyTransform);
   const cancelDraft = useSimulationStore((state) => state.cancelDraft);
   const clearPhoto = useSimulationStore((state) => state.clearPhoto);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   async function pickPhoto(source: SimulationPhotoSource) {
     try {
@@ -122,18 +125,32 @@ export default function SimulationScreen() {
 
   if (mode === "canvas" && photo && transform) {
     return (
-      <SimulationCanvasStage
-        onClearPhoto={clearPhoto}
-        photo={photo}
-        transform={transform}
-      />
+      <>
+        <SimulationCanvasStage
+          onClearPhoto={clearPhoto}
+          onOpenMenu={() => setIsMenuVisible(true)}
+          photo={photo}
+          transform={transform}
+        />
+        <SimulationMenuDrawer
+          onClose={() => setIsMenuVisible(false)}
+          visible={isMenuVisible}
+        />
+      </>
     );
   }
 
   return (
-    <SimulationInputStage
-      onOpenCamera={() => void pickPhoto("camera")}
-      onOpenLibrary={() => void pickPhoto("library")}
-    />
+    <>
+      <SimulationInputStage
+        onOpenCamera={() => void pickPhoto("camera")}
+        onOpenLibrary={() => void pickPhoto("library")}
+        onOpenMenu={() => setIsMenuVisible(true)}
+      />
+      <SimulationMenuDrawer
+        onClose={() => setIsMenuVisible(false)}
+        visible={isMenuVisible}
+      />
+    </>
   );
 }

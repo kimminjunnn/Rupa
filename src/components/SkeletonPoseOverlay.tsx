@@ -23,6 +23,7 @@ import {
 } from "../lib/bodyModel";
 import {
   createDefaultSkeletonPose,
+  createStandingSkeletonPose,
   getEndpointPosition,
   getSkeletonCenter,
   limitSkeletonPoseStepWithModel,
@@ -44,6 +45,7 @@ import {
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
   isCoreDragStart,
+  isQuadrantEndpointAllowed,
   shouldAllowSkeletonPinchScale,
 } from "../lib/skeletonPoseInteraction";
 import {
@@ -91,10 +93,16 @@ type SkeletonPoseOverlayProps = {
     activeControlId: string | null,
   ) => CharacterRigTransformOptions;
   initialCenter?: Point2D;
+  initialPoseVariant?: "default" | "standing";
   mode: "calibrating" | "simulating";
   onHistoryStateChange?: (state: SkeletonPoseOverlayHistoryState) => void;
   onPoseChange?: (pose: SkeletonPose) => void;
+  onTutorialDragEnd?: (target: SkeletonDragTarget | null) => void;
+  onTutorialQuadrantStart?: (endpointName: SkeletonEndpointName) => void;
   simulationInputMode?: "quadrants" | "handles";
+  tutorialDimInactiveQuadrants?: boolean;
+  tutorialPreviewQuadrantEndpoint?: SkeletonEndpointName | null;
+  tutorialQuadrantEndpoint?: SkeletonEndpointName | null;
   viewportHeight: number;
   viewportWidth: number;
 };
@@ -277,12 +285,12 @@ function createDefaultPose(
   viewportWidth: number,
   viewportHeight: number,
   initialCenter?: Point2D,
+  variant: "default" | "standing" = "default",
 ) {
-  const defaultPose = createDefaultSkeletonPose(
-    bodyModel,
-    viewportWidth,
-    viewportHeight,
-  );
+  const defaultPose =
+    variant === "standing"
+      ? createStandingSkeletonPose(bodyModel, viewportWidth, viewportHeight)
+      : createDefaultSkeletonPose(bodyModel, viewportWidth, viewportHeight);
 
   if (!initialCenter) {
     return defaultPose;
@@ -326,10 +334,16 @@ export const SkeletonPoseOverlay = forwardRef<
     characterRenderStyle = "stickmanCharacter",
     getCharacterTransformOptions = getRupaCharacterTransformOptions,
     initialCenter,
+    initialPoseVariant = "default",
     mode,
     onHistoryStateChange,
     onPoseChange,
+    onTutorialDragEnd,
+    onTutorialQuadrantStart,
     simulationInputMode = "handles",
+    tutorialDimInactiveQuadrants = false,
+    tutorialPreviewQuadrantEndpoint = null,
+    tutorialQuadrantEndpoint = null,
     viewportHeight,
     viewportWidth,
   },
@@ -345,7 +359,13 @@ export const SkeletonPoseOverlay = forwardRef<
     [profile, scale],
   );
   const [pose, setPose] = useState<SkeletonPose>(() =>
-    createDefaultPose(bodyModel, viewportWidth, viewportHeight, initialCenter),
+    createDefaultPose(
+      bodyModel,
+      viewportWidth,
+      viewportHeight,
+      initialCenter,
+      initialPoseVariant,
+    ),
   );
   const [historyState, setHistoryState] =
     useState<SkeletonPoseOverlayHistoryState>({
@@ -362,6 +382,8 @@ export const SkeletonPoseOverlay = forwardRef<
     isRasterCharacterRenderStyle(characterRenderStyle);
   const shouldRenderVectorCharacter =
     isVectorCharacterRenderStyle(characterRenderStyle);
+  const visibleQuadrantHintEndpoint =
+    activeQuadrantEndpoint ?? tutorialPreviewQuadrantEndpoint;
   const characterOpacity = getSkeletonCharacterOverlayOpacity({
     activeControlId,
     characterRenderStyle,
@@ -433,12 +455,20 @@ export const SkeletonPoseOverlay = forwardRef<
       initialCenterX !== undefined && initialCenterY !== undefined
         ? { x: initialCenterX, y: initialCenterY }
         : undefined,
+      initialPoseVariant,
     );
 
     poseRef.current = defaultPose;
     setPose(defaultPose);
     clearHistory();
-  }, [initialCenterX, initialCenterY, profile, viewportHeight, viewportWidth]);
+  }, [
+    initialCenterX,
+    initialCenterY,
+    initialPoseVariant,
+    profile,
+    viewportHeight,
+    viewportWidth,
+  ]);
 
   useImperativeHandle(
     ref,
@@ -594,6 +624,41 @@ export const SkeletonPoseOverlay = forwardRef<
   }
 
   function beginQuadrantDrag(point: Point2D) {
+    if (tutorialQuadrantEndpoint !== null) {
+      if (
+        isCoreDragStart({
+          height: viewportHeight,
+          radius: QUADRANT_CORE_HANDLE_RADIUS,
+          width: viewportWidth,
+          x: point.x,
+          y: point.y,
+        })
+      ) {
+        return;
+      }
+
+      const endpointName = getQuadrantEndpointName({
+        height: viewportHeight,
+        width: viewportWidth,
+        x: point.x,
+        y: point.y,
+      });
+
+      if (
+        !isQuadrantEndpointAllowed({
+          allowedEndpointName: tutorialQuadrantEndpoint,
+          endpointName,
+        })
+      ) {
+        return;
+      }
+
+      onTutorialQuadrantStart?.(endpointName);
+      beginEndpointDrag(endpointName);
+      setActiveQuadrantEndpoint(endpointName);
+      return;
+    }
+
     if (
       isCoreDragStart({
         height: viewportHeight,
@@ -859,6 +924,8 @@ export const SkeletonPoseOverlay = forwardRef<
   }
 
   function endEndpointDrag() {
+    const endedTarget = activeDragTargetRef.current;
+
     commitPoseHistory(dragStartSnapshotRef.current);
     activeDragModeRef.current = null;
     dragStartPointRef.current = null;
@@ -867,6 +934,7 @@ export const SkeletonPoseOverlay = forwardRef<
     setActiveQuadrantEndpoint(null);
     setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
+    onTutorialDragEnd?.(endedTarget);
   }
 
   function beginPinchScale(event: GestureResponderEvent) {
@@ -1041,7 +1109,13 @@ export const SkeletonPoseOverlay = forwardRef<
         onPanResponderRelease: endEndpointDrag,
         onPanResponderTerminate: endEndpointDrag,
       }),
-    [simulationInputMode, viewportHeight, viewportWidth],
+    [
+      onTutorialQuadrantStart,
+      simulationInputMode,
+      tutorialQuadrantEndpoint,
+      viewportHeight,
+      viewportWidth,
+    ],
   );
 
   const pinchResponder = useMemo(
@@ -1327,6 +1401,29 @@ export const SkeletonPoseOverlay = forwardRef<
           accessibilityLabel="4분할 손발 드래그"
           style={styles.quadrantDragLayer}
         >
+          {tutorialDimInactiveQuadrants && tutorialPreviewQuadrantEndpoint ? (
+            <View pointerEvents="none" style={styles.tutorialQuadrantShade}>
+              {ENDPOINTS.filter(
+                (endpointName) =>
+                  endpointName !== tutorialPreviewQuadrantEndpoint,
+              ).map((endpointName) => (
+                <View
+                  key={endpointName}
+                  style={[
+                    styles.tutorialDimmedQuadrant,
+                    getQuadrantHintPosition(endpointName),
+                  ]}
+                />
+              ))}
+              <View
+                style={[
+                  styles.tutorialHighlightedQuadrant,
+                  getQuadrantHintPosition(tutorialPreviewQuadrantEndpoint),
+                ]}
+              />
+            </View>
+          ) : null}
+
           {isQuadrantCoreActive ? (
             <View
               pointerEvents="none"
@@ -1352,19 +1449,19 @@ export const SkeletonPoseOverlay = forwardRef<
             </View>
           ) : null}
 
-          {activeQuadrantEndpoint ? (
+          {visibleQuadrantHintEndpoint ? (
             <View
               pointerEvents="none"
               style={[
                 styles.quadrantHintCell,
-                getQuadrantHintPosition(activeQuadrantEndpoint),
+                getQuadrantHintPosition(visibleQuadrantHintEndpoint),
               ]}
             >
               <View style={styles.quadrantControlBadge}>
                 <Image
                   accessibilityIgnoresInvertColors
                   resizeMode="contain"
-                  source={getQuadrantEndpointIcon(activeQuadrantEndpoint)}
+                  source={getQuadrantEndpointIcon(visibleQuadrantHintEndpoint)}
                   style={styles.quadrantControlIcon}
                 />
               </View>
@@ -1397,6 +1494,23 @@ const styles = StyleSheet.create({
   },
   quadrantDragLayer: {
     ...StyleSheet.absoluteFillObject,
+  },
+  tutorialQuadrantShade: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  tutorialDimmedQuadrant: {
+    position: "absolute",
+    width: "50%",
+    height: "50%",
+    backgroundColor: "rgba(15,15,15,0.34)",
+  },
+  tutorialHighlightedQuadrant: {
+    position: "absolute",
+    width: "50%",
+    height: "50%",
+    borderWidth: 2,
+    borderColor: "rgba(254,214,96,0.72)",
+    backgroundColor: "rgba(254,214,96,0.06)",
   },
   quadrantCoreHandle: {
     position: "absolute",

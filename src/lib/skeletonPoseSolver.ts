@@ -272,6 +272,84 @@ export function createDefaultSkeletonPose(
   };
 }
 
+export function createStandingSkeletonPose(
+  model: SkeletonBodyModel,
+  viewportWidth: number,
+  viewportHeight: number,
+): SkeletonPose {
+  const center = { x: viewportWidth / 2, y: viewportHeight / 2 };
+  const torso = { x: center.x, y: center.y - model.torsoToPelvis * 0.45 };
+  const pelvis = { x: center.x, y: torso.y + model.torsoToPelvis };
+  const neck = { x: center.x, y: torso.y - model.neckToTorso };
+  const leftShoulder = { x: neck.x - model.shoulderWidth / 2, y: neck.y + 8 };
+  const rightShoulder = { x: neck.x + model.shoulderWidth / 2, y: neck.y + 8 };
+  const leftHip = { x: pelvis.x - model.hipWidth / 2, y: pelvis.y };
+  const rightHip = { x: pelvis.x + model.hipWidth / 2, y: pelvis.y };
+  const armReach = model.upperArm + model.forearm;
+  const legReach = model.thigh + model.shin;
+  const leftArm = solveTwoBoneJoint(
+    leftShoulder,
+    {
+      x: leftShoulder.x - armReach * 1,
+      y: leftShoulder.y + armReach * 10,
+    },
+    model.upperArm,
+    model.forearm,
+    -1,
+  );
+  const rightArm = solveTwoBoneJoint(
+    rightShoulder,
+    {
+      x: rightShoulder.x + armReach * 1,
+      y: rightShoulder.y + armReach * 10,
+    },
+    model.upperArm,
+    model.forearm,
+    1,
+  );
+  const leftLeg = solveTwoBoneJoint(
+    leftHip,
+    {
+      x: leftHip.x - legReach * 1,
+      y: leftHip.y + legReach * 15,
+    },
+    model.thigh,
+    model.shin,
+    1,
+  );
+  const rightLeg = solveTwoBoneJoint(
+    rightHip,
+    {
+      x: rightHip.x + legReach * 1,
+      y: rightHip.y + legReach * 15,
+    },
+    model.thigh,
+    model.shin,
+    -1,
+  );
+
+  return {
+    joints: {
+      head: { x: neck.x, y: neck.y - model.headToNeck },
+      neck,
+      torso,
+      pelvis,
+      leftShoulder,
+      rightShoulder,
+      leftElbow: leftArm.joint,
+      rightElbow: rightArm.joint,
+      leftHand: leftArm.endpoint,
+      rightHand: rightArm.endpoint,
+      leftHip,
+      rightHip,
+      leftKnee: leftLeg.joint,
+      rightKnee: rightLeg.joint,
+      leftFoot: leftLeg.endpoint,
+      rightFoot: rightLeg.endpoint,
+    },
+  };
+}
+
 function getEndpointRootName(endpointName: SkeletonEndpointName) {
   switch (endpointName) {
     case "leftHand":
@@ -375,10 +453,7 @@ function currentBendDirection(
   return signedDistance > 0 ? 1 : -1;
 }
 
-function shiftCore(
-  joints: SkeletonPointMap,
-  delta: Point2D,
-): SkeletonPointMap {
+function shiftCore(joints: SkeletonPointMap, delta: Point2D): SkeletonPointMap {
   const shifted = { ...joints };
   const coreIds = [
     "head",
@@ -450,10 +525,7 @@ function getDirectionSide(direction: Point2D): -1 | 0 | 1 {
   return 0;
 }
 
-function rotateCore(
-  joints: SkeletonPointMap,
-  angle: number,
-): SkeletonPointMap {
+function rotateCore(joints: SkeletonPointMap, angle: number): SkeletonPointMap {
   if (Math.abs(angle) <= MIN_SOLVE_DISTANCE) {
     return joints;
   }
@@ -706,19 +778,17 @@ function resolveHandCoreShift(
     return { x: 0, y: 0 };
   }
 
-  const anchorShiftDistances = anchorEndpointNames.map(
-    (anchorEndpointName) => {
-      const anchorRootName = getEndpointRootName(anchorEndpointName);
-      const lengths = limbLengths(model, anchorEndpointName);
+  const anchorShiftDistances = anchorEndpointNames.map((anchorEndpointName) => {
+    const anchorRootName = getEndpointRootName(anchorEndpointName);
+    const lengths = limbLengths(model, anchorEndpointName);
 
-      return maxAnchoredShiftDistance(
-        joints[anchorRootName],
-        joints[anchorEndpointName],
-        direction,
-        lengths.first + lengths.second,
-      );
-    },
-  );
+    return maxAnchoredShiftDistance(
+      joints[anchorRootName],
+      joints[anchorEndpointName],
+      direction,
+      lengths.first + lengths.second,
+    );
+  });
   const availableAnchorShiftDistances = anchorShiftDistances.filter(
     (shiftDistance) => shiftDistance > MIN_SOLVE_DISTANCE,
   );
@@ -1128,7 +1198,10 @@ export function resolveSkeletonHeadDrag(
     subtract(input.target, pose.joints.pelvis),
     -1,
   );
-  const rawSpineAngle = angleBetweenVectors(spineDirection, targetSpineDirection);
+  const rawSpineAngle = angleBetweenVectors(
+    spineDirection,
+    targetSpineDirection,
+  );
   const spineRotation =
     Math.abs(Math.abs(rawSpineAngle) - Math.PI) <= OPPOSITE_DIRECTION_EPSILON
       ? 0

@@ -5,10 +5,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { HomeGlassCard } from "../src/components/HomeGlassCard";
 import { HomeHeroHolds } from "../src/components/HomeHeroHolds";
+import { useOnboardingStore } from "../src/store/useOnboardingStore";
 import { brand } from "../src/theme/brand";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const hasCompletedOnboarding = useOnboardingStore(
+    (state) => state.hasCompletedOnboarding,
+  );
+
+  function handleStart() {
+    router.replace(
+      hasCompletedOnboarding ? "/(tabs)/simulation" : "/onboarding",
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -20,7 +30,7 @@ export default function HomeScreen() {
           </View>
 
           <Pressable
-            onPress={() => router.replace("/(tabs)/simulation")}
+            onPress={handleStart}
             style={styles.ctaButton}
           >
             <Text style={styles.ctaText}>시작하기</Text>

@@ -20,6 +20,13 @@ export function getQuadrantEndpointName({ width, height, x, y }) {
   return isLeft ? "leftFoot" : "rightFoot";
 }
 
+export function isQuadrantEndpointAllowed({
+  allowedEndpointName,
+  endpointName,
+}) {
+  return allowedEndpointName === null || endpointName === allowedEndpointName;
+}
+
 export function isCoreDragStart({ width, height, x, y, radius = 52 }) {
   const centerX = width / 2;
   const centerY = height / 2;
