@@ -24,7 +24,7 @@ export function SimulationMenuDrawer({
   const actions: DrawerAction[] = [
     {
       icon: "home-outline",
-      label: "홈으로",
+      label: "홈",
       onPress: () => {
         onClose();
         router.replace("/");
@@ -32,7 +32,7 @@ export function SimulationMenuDrawer({
     },
     {
       icon: "school-outline",
-      label: "튜토리얼 다시 보기",
+      label: "조작 연습",
       onPress: () => {
         onClose();
         router.push({ pathname: "/onboarding", params: { mode: "tutorial" } });
