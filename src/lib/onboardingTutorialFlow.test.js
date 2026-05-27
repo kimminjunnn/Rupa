@@ -48,19 +48,26 @@ test("defines the onboarding tutorial sequence from matching hands through direc
       "undo",
       "redo",
       "directMode",
-      "dropKnee",
+      "neckJoint",
+      "elbowJoint",
+      "kneeJoint",
       "complete",
     ],
   );
   assert.equal(getOnboardingTutorialStep("directMode").body, "목, 팔꿈치, 무릎도 직접 조정할 수 있어요.");
-  assert.equal(getOnboardingTutorialStep("dropKnee").body, "무릎을 안쪽으로 넣어 드롭니 자세를 만들 수 있어요.");
+  assert.equal(getOnboardingTutorialStep("neckJoint").title, "목 조정하기");
+  assert.equal(getOnboardingTutorialStep("elbowJoint").title, "팔꿈치 조정하기");
+  assert.equal(getOnboardingTutorialStep("kneeJoint").title, "무릎 조정하기");
 });
 
 test("advances to the next tutorial step without delay when the target is reached", () => {
   assert.equal(getNextOnboardingTutorialStepId("welcome"), "leftHand");
   assert.equal(getNextOnboardingTutorialStepId("leftHand"), "rightHandMatch");
   assert.equal(getNextOnboardingTutorialStepId("rightFoot"), "body");
-  assert.equal(getNextOnboardingTutorialStepId("dropKnee"), "complete");
+  assert.equal(getNextOnboardingTutorialStepId("directMode"), "neckJoint");
+  assert.equal(getNextOnboardingTutorialStepId("neckJoint"), "elbowJoint");
+  assert.equal(getNextOnboardingTutorialStepId("elbowJoint"), "kneeJoint");
+  assert.equal(getNextOnboardingTutorialStepId("kneeJoint"), "complete");
   assert.equal(getNextOnboardingTutorialStepId("complete"), "complete");
 });
 
@@ -93,12 +100,11 @@ test("uses one shared head-height hold for left hand and right hand matching", (
   );
 });
 
-test("checks foot, body, and drop-knee targets against their active control only", () => {
+test("checks foot and body targets against their active control only", () => {
   const layout = createOnboardingTutorialTargetLayout(400, 700);
   const pose = createPose({
     leftFoot: layout.leftFootHold,
     rightFoot: layout.rightFootHold,
-    rightKnee: layout.dropKnee,
     torso: { x: layout.bodyCenter.x, y: layout.bodyCenter.y - 30 },
     pelvis: { x: layout.bodyCenter.x, y: layout.bodyCenter.y + 30 },
   });
@@ -135,8 +141,8 @@ test("checks foot, body, and drop-knee targets against their active control only
       layout,
       pose,
       radius: 18,
-      step: getOnboardingTutorialStep("dropKnee"),
+      step: getOnboardingTutorialStep("kneeJoint"),
     }),
-    true,
+    false,
   );
 });

@@ -96,11 +96,18 @@ type SkeletonPoseOverlayProps = {
   initialPoseVariant?: "default" | "standing";
   mode: "calibrating" | "simulating";
   onHistoryStateChange?: (state: SkeletonPoseOverlayHistoryState) => void;
+  onTutorialHandleStart?: (target: SkeletonDragTarget) => void;
   onPoseChange?: (pose: SkeletonPose) => void;
   onTutorialDragEnd?: (target: SkeletonDragTarget | null) => void;
-  onTutorialQuadrantStart?: (endpointName: SkeletonEndpointName) => void;
+  onTutorialQuadrantStart?: (target: "body" | SkeletonEndpointName) => void;
   simulationInputMode?: "quadrants" | "handles";
+  tutorialBodyOnly?: boolean;
+  tutorialDirectJointGroup?: "neck" | "elbows" | "knees" | null;
+  tutorialDisableDirectHandles?: boolean;
+  tutorialDisableQuadrants?: boolean;
+  tutorialDimDirectJoints?: boolean;
   tutorialDimInactiveQuadrants?: boolean;
+  tutorialPreviewBody?: boolean;
   tutorialPreviewQuadrantEndpoint?: SkeletonEndpointName | null;
   tutorialQuadrantEndpoint?: SkeletonEndpointName | null;
   viewportHeight: number;
@@ -337,11 +344,18 @@ export const SkeletonPoseOverlay = forwardRef<
     initialPoseVariant = "default",
     mode,
     onHistoryStateChange,
+    onTutorialHandleStart,
     onPoseChange,
     onTutorialDragEnd,
     onTutorialQuadrantStart,
     simulationInputMode = "handles",
+    tutorialBodyOnly = false,
+    tutorialDirectJointGroup = null,
+    tutorialDisableDirectHandles = false,
+    tutorialDisableQuadrants = false,
+    tutorialDimDirectJoints = false,
     tutorialDimInactiveQuadrants = false,
+    tutorialPreviewBody = false,
     tutorialPreviewQuadrantEndpoint = null,
     tutorialQuadrantEndpoint = null,
     viewportHeight,
@@ -417,6 +431,21 @@ export const SkeletonPoseOverlay = forwardRef<
   const pinchStartDistanceRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef(scale);
   const hitFramesRef = useRef<Record<string, HitFrame>>({});
+  const tutorialDirectJointGroupRef = useRef(tutorialDirectJointGroup);
+  const onTutorialHandleStartRef = useRef(onTutorialHandleStart);
+  const onTutorialDragEndRef = useRef(onTutorialDragEnd);
+
+  useEffect(() => {
+    tutorialDirectJointGroupRef.current = tutorialDirectJointGroup;
+  }, [tutorialDirectJointGroup]);
+
+  useEffect(() => {
+    onTutorialHandleStartRef.current = onTutorialHandleStart;
+  }, [onTutorialHandleStart]);
+
+  useEffect(() => {
+    onTutorialDragEndRef.current = onTutorialDragEnd;
+  }, [onTutorialDragEnd]);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -573,7 +602,33 @@ export const SkeletonPoseOverlay = forwardRef<
     setActiveControlId(getDragTargetKey(target));
   }
 
+  function isTutorialDirectTargetAllowed(target: SkeletonDragTarget) {
+    const currentDirectJointGroup = tutorialDirectJointGroupRef.current;
+
+    if (currentDirectJointGroup === null) {
+      return true;
+    }
+
+    if (currentDirectJointGroup === "neck") {
+      return target.kind === "head";
+    }
+
+    if (target.kind !== "joint") {
+      return false;
+    }
+
+    return currentDirectJointGroup === "elbows"
+      ? target.id === "leftElbow" || target.id === "rightElbow"
+      : target.id === "leftKnee" || target.id === "rightKnee";
+  }
+
   function beginEndpointDrag(endpointName: SkeletonEndpointName) {
+    const target: SkeletonDragTarget = { kind: "endpoint", id: endpointName };
+
+    if (!isTutorialDirectTargetAllowed(target)) {
+      return;
+    }
+
     setActiveQuadrantEndpoint(null);
     setIsQuadrantCoreActive(false);
     activeDragModeRef.current = null;
@@ -583,7 +638,8 @@ export const SkeletonPoseOverlay = forwardRef<
     );
     dragStartPoseRef.current = poseRef.current;
     dragStartSnapshotRef.current = getCurrentSnapshot();
-    setActiveDragTarget({ kind: "endpoint", id: endpointName });
+    setActiveDragTarget(target);
+    onTutorialHandleStartRef.current?.(target);
   }
 
   function beginQuadrantEndpointDrag(point: Point2D) {
@@ -599,31 +655,71 @@ export const SkeletonPoseOverlay = forwardRef<
   }
 
   function beginJointDrag(jointName: SkeletonControlJointName) {
+    const target: SkeletonDragTarget = { kind: "joint", id: jointName };
+
+    if (!isTutorialDirectTargetAllowed(target)) {
+      return;
+    }
+
     activeDragModeRef.current = null;
     dragStartPointRef.current = poseRef.current.joints[jointName];
     dragStartPoseRef.current = poseRef.current;
     dragStartSnapshotRef.current = getCurrentSnapshot();
-    setActiveDragTarget({ kind: "joint", id: jointName });
+    setActiveDragTarget(target);
+    onTutorialHandleStartRef.current?.(target);
   }
 
   function beginHeadDrag() {
+    const target: SkeletonDragTarget = { kind: "head" };
+
+    if (!isTutorialDirectTargetAllowed(target)) {
+      return;
+    }
+
     activeDragModeRef.current = null;
     dragStartPointRef.current = poseRef.current.joints.head;
     dragStartPoseRef.current = poseRef.current;
     dragStartSnapshotRef.current = getCurrentSnapshot();
-    setActiveDragTarget({ kind: "head" });
+    setActiveDragTarget(target);
+    onTutorialHandleStartRef.current?.(target);
   }
 
   function beginBodyDrag() {
+    const target: SkeletonDragTarget = { kind: "body" };
+
+    if (!isTutorialDirectTargetAllowed(target)) {
+      return;
+    }
+
     setActiveQuadrantEndpoint(null);
     activeDragModeRef.current = null;
     dragStartPointRef.current = null;
     dragStartPoseRef.current = poseRef.current;
     dragStartSnapshotRef.current = getCurrentSnapshot();
-    setActiveDragTarget({ kind: "body" });
+    setActiveDragTarget(target);
+    onTutorialHandleStartRef.current?.(target);
   }
 
   function beginQuadrantDrag(point: Point2D) {
+    if (tutorialBodyOnly) {
+      if (
+        !isCoreDragStart({
+          height: viewportHeight,
+          radius: QUADRANT_CORE_HANDLE_RADIUS,
+          width: viewportWidth,
+          x: point.x,
+          y: point.y,
+        })
+      ) {
+        return;
+      }
+
+      onTutorialQuadrantStart?.("body");
+      beginBodyDrag();
+      setIsQuadrantCoreActive(true);
+      return;
+    }
+
     if (tutorialQuadrantEndpoint !== null) {
       if (
         isCoreDragStart({
@@ -934,7 +1030,7 @@ export const SkeletonPoseOverlay = forwardRef<
     setActiveQuadrantEndpoint(null);
     setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
-    onTutorialDragEnd?.(endedTarget);
+    onTutorialDragEndRef.current?.(endedTarget);
   }
 
   function beginPinchScale(event: GestureResponderEvent) {
@@ -1086,6 +1182,23 @@ export const SkeletonPoseOverlay = forwardRef<
     [],
   );
 
+  const neckResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          beginHeadDrag();
+        },
+        onPanResponderMove: (_event, gestureState) => {
+          moveActiveDrag(gestureState);
+        },
+        onPanResponderRelease: endEndpointDrag,
+        onPanResponderTerminate: endEndpointDrag,
+      }),
+    [],
+  );
+
   const quadrantResponder = useMemo(
     () =>
       PanResponder.create({
@@ -1112,6 +1225,7 @@ export const SkeletonPoseOverlay = forwardRef<
     [
       onTutorialQuadrantStart,
       simulationInputMode,
+      tutorialBodyOnly,
       tutorialQuadrantEndpoint,
       viewportHeight,
       viewportWidth,
@@ -1130,6 +1244,32 @@ export const SkeletonPoseOverlay = forwardRef<
       }),
     [],
   );
+
+  const isDirectJointTutorial = tutorialDirectJointGroup !== null;
+  const shouldShowBodyHitArea =
+    !tutorialDisableDirectHandles && !isDirectJointTutorial;
+  const shouldShowEndpointHitAreas =
+    !tutorialDisableDirectHandles && !isDirectJointTutorial;
+  const shouldShowHeadHitArea =
+    !tutorialDisableDirectHandles &&
+    (!isDirectJointTutorial || tutorialDirectJointGroup === "neck");
+
+  function isJointInTutorialGroup(jointName: SkeletonControlJointName) {
+    return (
+      (tutorialDirectJointGroup === "elbows" &&
+        (jointName === "leftElbow" || jointName === "rightElbow")) ||
+      (tutorialDirectJointGroup === "knees" &&
+        (jointName === "leftKnee" || jointName === "rightKnee"))
+    );
+  }
+
+  function shouldShowJointHitArea(jointName: SkeletonControlJointName) {
+    if (tutorialDisableDirectHandles) {
+      return false;
+    }
+
+    return !isDirectJointTutorial || isJointInTutorialGroup(jointName);
+  }
 
   return (
     <View
@@ -1222,24 +1362,43 @@ export const SkeletonPoseOverlay = forwardRef<
           {CONTROL_JOINTS.map((jointName) => {
             const point = pose.joints[jointName];
             const isActive = jointName === activeControlId;
+            const shouldHighlight =
+              isJointInTutorialGroup(jointName) ||
+              isActive;
 
             return (
               <Circle
                 key={jointName}
                 cx={point.x}
                 cy={point.y}
-                fill={isActive ? "#ffb37a" : "rgba(255,255,255,0.74)"}
+                fill={shouldHighlight ? "#ffb37a" : "rgba(255,255,255,0.74)"}
                 opacity={
-                  isActive && !shouldShowCharacter
+                  shouldHighlight && !shouldShowCharacter
                     ? 1
                     : characterOpacity.inactiveJoint
                 }
-                r={isActive ? metrics.jointActiveRadius : metrics.jointRadius}
+                r={
+                  shouldHighlight
+                    ? metrics.jointActiveRadius
+                    : metrics.jointRadius
+                }
                 stroke="rgba(15,15,15,0.84)"
                 strokeWidth={2.2}
               />
             );
           })}
+
+          {tutorialDirectJointGroup === "neck" ? (
+            <Circle
+              cx={pose.joints.neck.x}
+              cy={pose.joints.neck.y}
+              fill="#ffb37a"
+              opacity={!shouldShowCharacter ? 1 : characterOpacity.inactiveJoint}
+              r={metrics.jointActiveRadius}
+              stroke="rgba(15,15,15,0.84)"
+              strokeWidth={2.2}
+            />
+          ) : null}
 
           {ENDPOINTS.map((endpointName) => {
             const point = pose.joints[endpointName];
@@ -1269,100 +1428,141 @@ export const SkeletonPoseOverlay = forwardRef<
         </Svg>
       </View>
 
-      <View
-        {...bodyResponder.panHandlers}
-        accessibilityHint={
-          shouldShowCharacter
-            ? "끌어서 캐릭터 전체 위치를 조정합니다."
-            : "끌어서 스켈레톤 전체 위치를 조정합니다."
-        }
-        accessibilityLabel={
-          shouldShowCharacter ? "캐릭터 전체 이동" : "스켈레톤 전체 이동"
-        }
-        style={[
-          styles.bodyHitArea,
-          (() => {
+      {tutorialDimDirectJoints && isDirectJointTutorial ? (
+        <View pointerEvents="none" style={styles.tutorialDirectJointShade}>
+          <Svg height="100%" width="100%">
+            {tutorialDirectJointGroup === "neck" ? (
+              <Circle
+                cx={pose.joints.neck.x}
+                cy={pose.joints.neck.y}
+                fill="#ffb37a"
+                r={metrics.jointActiveRadius + 3}
+                stroke="rgba(254,214,96,0.92)"
+                strokeWidth={3}
+              />
+            ) : null}
+            {CONTROL_JOINTS.filter(isJointInTutorialGroup).map((jointName) => (
+              <Circle
+                key={jointName}
+                cx={pose.joints[jointName].x}
+                cy={pose.joints[jointName].y}
+                fill="#ffb37a"
+                r={metrics.jointActiveRadius + 3}
+                stroke="rgba(254,214,96,0.92)"
+                strokeWidth={3}
+              />
+            ))}
+          </Svg>
+        </View>
+      ) : null}
+
+      {shouldShowBodyHitArea ? (
+        <View
+          {...bodyResponder.panHandlers}
+          accessibilityHint={
+            shouldShowCharacter
+              ? "끌어서 캐릭터 전체 위치를 조정합니다."
+              : "끌어서 스켈레톤 전체 위치를 조정합니다."
+          }
+          accessibilityLabel={
+            shouldShowCharacter ? "캐릭터 전체 이동" : "스켈레톤 전체 이동"
+          }
+          style={[
+            styles.bodyHitArea,
+            (() => {
+              const hitSize = shouldShowCharacter
+                ? metrics.bodyHitSize * 1.85
+                : metrics.bodyHitSize;
+              const frame = {
+                left: skeletonCenter.x - hitSize / 2,
+                top: skeletonCenter.y - hitSize / 2,
+              };
+
+              hitFramesRef.current.body = frame;
+
+              return {
+                ...frame,
+                width: hitSize,
+                height: hitSize,
+                borderRadius: hitSize / 2,
+              };
+            })(),
+          ]}
+        />
+      ) : null}
+
+      {shouldShowHeadHitArea ? (
+        <View
+          {...(tutorialDirectJointGroup === "neck"
+            ? neckResponder.panHandlers
+            : headResponder.panHandlers)}
+          accessibilityHint="끌어서 머리 방향을 조정합니다."
+          accessibilityLabel={
+            tutorialDirectJointGroup === "neck" ? "목 이동" : "머리 이동"
+          }
+          style={[
+            styles.headHitArea,
+            (() => {
+              const point =
+                tutorialDirectJointGroup === "neck"
+                  ? pose.joints.neck
+                  : pose.joints.head;
+              const hitSize = shouldShowCharacter
+                ? metrics.headHitSize * 1.45
+                : metrics.headHitSize;
+              const frame = {
+                left: point.x - hitSize / 2,
+                top: point.y - hitSize / 2,
+              };
+
+              hitFramesRef.current.head = frame;
+
+              return {
+                ...frame,
+                width: hitSize,
+                height: hitSize,
+                borderRadius: hitSize / 2,
+              };
+            })(),
+          ]}
+        />
+      ) : null}
+
+      {shouldShowEndpointHitAreas
+        ? ENDPOINTS.map((endpointName) => {
+            const point = pose.joints[endpointName];
+            const hitFrameKey = `endpoint:${endpointName}`;
             const hitSize = shouldShowCharacter
-              ? metrics.bodyHitSize * 1.85
-              : metrics.bodyHitSize;
-            const frame = {
-              left: skeletonCenter.x - hitSize / 2,
-              top: skeletonCenter.y - hitSize / 2,
-            };
-
-            hitFramesRef.current.body = frame;
-
-            return {
-              ...frame,
-              width: hitSize,
-              height: hitSize,
-              borderRadius: hitSize / 2,
-            };
-          })(),
-        ]}
-      />
-
-      <View
-        {...headResponder.panHandlers}
-        accessibilityHint="끌어서 머리 방향을 조정합니다."
-        accessibilityLabel="머리 이동"
-        style={[
-          styles.headHitArea,
-          (() => {
-            const point = pose.joints.head;
-            const hitSize = shouldShowCharacter
-              ? metrics.headHitSize * 1.45
-              : metrics.headHitSize;
+              ? metrics.endpointHitSize * 1.35
+              : metrics.endpointHitSize;
             const frame = {
               left: point.x - hitSize / 2,
               top: point.y - hitSize / 2,
             };
 
-            hitFramesRef.current.head = frame;
+            hitFramesRef.current[hitFrameKey] = frame;
 
-            return {
-              ...frame,
-              width: hitSize,
-              height: hitSize,
-              borderRadius: hitSize / 2,
-            };
-          })(),
-        ]}
-      />
+            return (
+              <View
+                key={endpointName}
+                {...endpointResponders[endpointName].panHandlers}
+                accessibilityLabel={getEndpointAccessibilityLabel(endpointName)}
+                accessibilityHint="끌어서 손이나 발 위치를 조정합니다."
+                style={[
+                  styles.handleHitArea,
+                  {
+                    ...frame,
+                    width: hitSize,
+                    height: hitSize,
+                    borderRadius: hitSize / 2,
+                  },
+                ]}
+              />
+            );
+          })
+        : null}
 
-      {ENDPOINTS.map((endpointName) => {
-        const point = pose.joints[endpointName];
-        const hitFrameKey = `endpoint:${endpointName}`;
-        const hitSize = shouldShowCharacter
-          ? metrics.endpointHitSize * 1.35
-          : metrics.endpointHitSize;
-        const frame = {
-          left: point.x - hitSize / 2,
-          top: point.y - hitSize / 2,
-        };
-
-        hitFramesRef.current[hitFrameKey] = frame;
-
-        return (
-          <View
-            key={endpointName}
-            {...endpointResponders[endpointName].panHandlers}
-            accessibilityLabel={getEndpointAccessibilityLabel(endpointName)}
-            accessibilityHint="끌어서 손이나 발 위치를 조정합니다."
-            style={[
-              styles.handleHitArea,
-              {
-                ...frame,
-                width: hitSize,
-                height: hitSize,
-                borderRadius: hitSize / 2,
-              },
-            ]}
-          />
-        );
-      })}
-
-      {CONTROL_JOINTS.map((jointName) => {
+      {CONTROL_JOINTS.filter(shouldShowJointHitArea).map((jointName) => {
         const point = pose.joints[jointName];
         const hitFrameKey = `joint:${jointName}`;
         const hitSize = shouldShowCharacter
@@ -1394,18 +1594,24 @@ export const SkeletonPoseOverlay = forwardRef<
         );
       })}
 
-      {mode === "simulating" && simulationInputMode === "quadrants" ? (
+      {mode === "simulating" &&
+      simulationInputMode === "quadrants" &&
+      !tutorialDisableQuadrants ? (
         <View
           {...quadrantResponder.panHandlers}
           accessibilityHint="화면 가운데는 몸통, 좌상단은 왼손, 우상단은 오른손, 좌하단은 왼발, 우하단은 오른발을 움직입니다."
           accessibilityLabel="4분할 손발 드래그"
           style={styles.quadrantDragLayer}
         >
-          {tutorialDimInactiveQuadrants && tutorialPreviewQuadrantEndpoint ? (
+          {tutorialDimInactiveQuadrants &&
+          (tutorialPreviewQuadrantEndpoint || tutorialPreviewBody) ? (
             <View pointerEvents="none" style={styles.tutorialQuadrantShade}>
-              {ENDPOINTS.filter(
-                (endpointName) =>
-                  endpointName !== tutorialPreviewQuadrantEndpoint,
+              {(tutorialPreviewBody
+                ? ENDPOINTS
+                : ENDPOINTS.filter(
+                    (endpointName) =>
+                      endpointName !== tutorialPreviewQuadrantEndpoint,
+                  )
               ).map((endpointName) => (
                 <View
                   key={endpointName}
@@ -1415,16 +1621,21 @@ export const SkeletonPoseOverlay = forwardRef<
                   ]}
                 />
               ))}
-              <View
-                style={[
-                  styles.tutorialHighlightedQuadrant,
-                  getQuadrantHintPosition(tutorialPreviewQuadrantEndpoint),
-                ]}
-              />
+              {tutorialPreviewQuadrantEndpoint ? (
+                <View
+                  style={[
+                    styles.tutorialHighlightedQuadrant,
+                    getQuadrantHintPosition(tutorialPreviewQuadrantEndpoint),
+                  ]}
+                />
+              ) : null}
+              {tutorialPreviewBody ? (
+                <View style={styles.tutorialHighlightedBody} />
+              ) : null}
             </View>
           ) : null}
 
-          {isQuadrantCoreActive ? (
+          {isQuadrantCoreActive || tutorialPreviewBody ? (
             <View
               pointerEvents="none"
               style={[
@@ -1498,6 +1709,11 @@ const styles = StyleSheet.create({
   tutorialQuadrantShade: {
     ...StyleSheet.absoluteFillObject,
   },
+  tutorialDirectJointShade: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    backgroundColor: "rgba(15,15,15,0.34)",
+  },
   tutorialDimmedQuadrant: {
     position: "absolute",
     width: "50%",
@@ -1511,6 +1727,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(254,214,96,0.72)",
     backgroundColor: "rgba(254,214,96,0.06)",
+  },
+  tutorialHighlightedBody: {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    width: QUADRANT_CORE_HANDLE_RADIUS * 2,
+    height: QUADRANT_CORE_HANDLE_RADIUS * 2,
+    marginLeft: -QUADRANT_CORE_HANDLE_RADIUS,
+    marginTop: -QUADRANT_CORE_HANDLE_RADIUS,
+    borderWidth: 2,
+    borderColor: "rgba(254,214,96,0.72)",
+    borderRadius: QUADRANT_CORE_HANDLE_RADIUS,
+    backgroundColor: "rgba(254,214,96,0.08)",
   },
   quadrantCoreHandle: {
     position: "absolute",

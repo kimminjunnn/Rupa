@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
   LayoutChangeEvent,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -21,7 +22,6 @@ import {
   createOnboardingTutorialTargetLayout,
   getNextOnboardingTutorialStepId,
   getOnboardingTutorialStep,
-  getTargetPointForStep,
   isTutorialStepTargetReached,
   type OnboardingTutorialStepId,
 } from "../src/lib/onboardingTutorialFlow";
@@ -29,11 +29,14 @@ import { useBodyProfileStore } from "../src/store/useBodyProfileStore";
 import { useOnboardingStore } from "../src/store/useOnboardingStore";
 import { brand } from "../src/theme/brand";
 import { deriveWingspan, type WingspanMode } from "../src/types/bodyProfile";
-import type { SkeletonPose } from "../src/types/skeletonPose";
-import type { SkeletonEndpointName } from "../src/types/skeletonPose";
+import type {
+  SkeletonEndpointName,
+  SkeletonPose,
+} from "../src/types/skeletonPose";
 
 const TARGET_RADIUS = 24;
 const HOLD_RADIUS = 12;
+type DirectJointTutorialGroup = "neck" | "elbows" | "knees";
 
 function toNumericInput(text: string) {
   return text.replace(/\D+/g, "");
@@ -70,6 +73,10 @@ export default function OnboardingScreen() {
   const [startedEndpointSteps, setStartedEndpointSteps] = useState<
     Partial<Record<OnboardingTutorialStepId, boolean>>
   >({});
+  const [isFreePractice, setIsFreePractice] = useState(false);
+  const [freePracticeInputMode, setFreePracticeInputMode] =
+    useState<"quadrants" | "handles">("handles");
+  const [isExitConfirmVisible, setIsExitConfirmVisible] = useState(false);
   const [heightError, setHeightError] = useState<string | null>(null);
   const [wingspanError, setWingspanError] = useState<string | null>(null);
   const [draftHeight, setDraftHeight] = useState(
@@ -97,24 +104,75 @@ export default function OnboardingScreen() {
         : null,
     [viewport.height, viewport.width],
   );
-  const currentTargetPoint = targetLayout
-    ? getTargetPointForStep(stepId, targetLayout)
-    : null;
   const skeletonCenter =
     viewport.width > 0 && viewport.height > 0
       ? { x: viewport.width * 0.5, y: viewport.height * 0.46 }
       : undefined;
-  const simulationInputMode =
-    stepId === "directMode" ? "quadrants" : currentStep.inputMode;
+  const simulationInputMode = isFreePractice
+    ? freePracticeInputMode
+    : stepId === "directMode"
+      ? "quadrants"
+      : currentStep.inputMode;
   const reachedStepRef = useRef<OnboardingTutorialStepId | null>(null);
   const activeTutorialEndpoint =
     currentStep.target?.kind === "endpoint" ? currentStep.target.id : null;
+  const isBodyTutorialStep = currentStep.target?.kind === "body";
+  const directJointTutorialGroup = getDirectJointTutorialGroup(stepId);
+  const isDirectJointTutorialStep = directJointTutorialGroup !== null;
+  const isQuadrantTutorialStep =
+    activeTutorialEndpoint !== null || isBodyTutorialStep;
+  const isHeaderOnlyTutorialStep =
+    !isFreePractice &&
+    (stepId === "undo" || stepId === "redo" || stepId === "directMode");
+  const shouldDisableDirectHandles =
+    !isFreePractice && (isQuadrantTutorialStep || isHeaderOnlyTutorialStep);
+  const shouldDisableQuadrants =
+    !isFreePractice && (isHeaderOnlyTutorialStep || isDirectJointTutorialStep);
   const shouldPreviewEndpoint =
     activeTutorialEndpoint !== null && !startedEndpointSteps[stepId];
+  const shouldPreviewBody = isBodyTutorialStep && !startedEndpointSteps[stepId];
+  const shouldDimDirectJoints =
+    !isFreePractice &&
+    isDirectJointTutorialStep &&
+    !startedEndpointSteps[stepId];
+  const shouldShowInstructionPanel = !isFreePractice && stepId !== "complete";
+  const shouldShowCompletionPanel = stepId === "complete" && !isFreePractice;
   const instructionBody =
-    stepId === "leftHand" && startedEndpointSteps.leftHand
+    !isFreePractice && stepId === "leftHand" && startedEndpointSteps.leftHand
       ? "상단 홀드를 왼손으로 제압해봐요!"
       : currentStep.body;
+
+  function getDirectJointTutorialGroup(
+    currentStepId: OnboardingTutorialStepId,
+  ): DirectJointTutorialGroup | null {
+    switch (currentStepId) {
+      case "neckJoint":
+        return "neck";
+      case "elbowJoint":
+        return "elbows";
+      case "kneeJoint":
+        return "knees";
+      default:
+        return null;
+    }
+  }
+
+  function isDirectJointTutorialTarget(
+    group: DirectJointTutorialGroup,
+    target: { kind: string; id?: string } | null,
+  ) {
+    if (group === "neck") {
+      return target?.kind === "head";
+    }
+
+    if (target?.kind !== "joint") {
+      return false;
+    }
+
+    return group === "elbows"
+      ? target.id === "leftElbow" || target.id === "rightElbow"
+      : target.id === "leftKnee" || target.id === "rightKnee";
+  }
 
   function handleViewportLayout(event: LayoutChangeEvent) {
     const { width, height } = event.nativeEvent.layout;
@@ -176,13 +234,34 @@ export default function OnboardingScreen() {
 
     if (nextStepId === "complete") {
       setStepId("complete");
-      completeOnboarding();
-      router.replace("/(tabs)/simulation");
       return;
     }
 
     reachedStepRef.current = null;
     setStepId(nextStepId);
+  }
+
+  function handleStartFreePractice() {
+    completeOnboarding();
+    setIsFreePractice(true);
+  }
+
+  function handleExitTutorial() {
+    completeOnboarding();
+    router.replace("/(tabs)/simulation");
+  }
+
+  function handleRequestExitTutorial() {
+    setIsExitConfirmVisible(true);
+  }
+
+  function handleCancelExitTutorial() {
+    setIsExitConfirmVisible(false);
+  }
+
+  function handleConfirmExitTutorial() {
+    setIsExitConfirmVisible(false);
+    handleExitTutorial();
   }
 
   function handlePoseChange(pose: SkeletonPose) {
@@ -207,8 +286,18 @@ export default function OnboardingScreen() {
     id?: string;
   } | null) {
     if (
-      target?.kind !== "endpoint" ||
-      target.id !== activeTutorialEndpoint ||
+      directJointTutorialGroup &&
+      isDirectJointTutorialTarget(directJointTutorialGroup, target)
+    ) {
+      completedStepRef.current = stepId;
+      advanceTutorial();
+      return;
+    }
+
+    if (
+      target?.kind !== currentStep.target?.kind ||
+      (currentStep.target?.kind === "endpoint" &&
+        target?.id !== activeTutorialEndpoint) ||
       reachedStepRef.current !== stepId
     ) {
       return;
@@ -218,15 +307,32 @@ export default function OnboardingScreen() {
       stepId === "leftHand" ||
       stepId === "rightHandMatch" ||
       stepId === "leftFoot" ||
-      stepId === "rightFoot"
+      stepId === "rightFoot" ||
+      stepId === "body"
     ) {
       completedStepRef.current = stepId;
       advanceTutorial();
     }
   }
 
-  function handleTutorialQuadrantStart(endpointName: SkeletonEndpointName) {
-    if (endpointName !== activeTutorialEndpoint) {
+  function handleTutorialHandleStart(target: { kind: string; id?: string }) {
+    if (
+      !directJointTutorialGroup ||
+      !isDirectJointTutorialTarget(directJointTutorialGroup, target)
+    ) {
+      return;
+    }
+
+    setStartedEndpointSteps((currentSteps) => ({
+      ...currentSteps,
+      [stepId]: true,
+    }));
+  }
+
+  function handleTutorialQuadrantStart(
+    target: "body" | SkeletonEndpointName,
+  ) {
+    if (target !== activeTutorialEndpoint && target !== currentStep.target?.kind) {
       return;
     }
 
@@ -339,7 +445,9 @@ export default function OnboardingScreen() {
           "undo",
           "redo",
           "directMode",
-          "dropKnee",
+          "neckJoint",
+          "elbowJoint",
+          "kneeJoint",
           "complete",
         ].includes(stepId) ? (
           <Circle
@@ -356,7 +464,9 @@ export default function OnboardingScreen() {
           "undo",
           "redo",
           "directMode",
-          "dropKnee",
+          "neckJoint",
+          "elbowJoint",
+          "kneeJoint",
           "complete",
         ].includes(stepId) ? (
           <Circle
@@ -399,27 +509,109 @@ export default function OnboardingScreen() {
     );
   }
 
+  function shouldShowChromeControls() {
+    return (
+      isFreePractice ||
+      stepId === "undo" ||
+      stepId === "redo" ||
+      stepId === "directMode" ||
+      isDirectJointTutorialStep
+    );
+  }
+
+  function renderTutorialChromeControls() {
+    if (!shouldShowChromeControls()) {
+      return null;
+    }
+
+    return (
+      <>
+        {renderSpotlightButton({
+          disabled: !isFreePractice && stepId !== "directMode",
+          icon:
+            isFreePractice && freePracticeInputMode === "handles"
+              ? "hand-left-outline"
+              : isDirectJointTutorialStep
+                ? "hand-left-outline"
+                : "grid",
+          isActive: !isFreePractice && stepId === "directMode",
+          label:
+            isFreePractice && freePracticeInputMode === "handles"
+              ? "4분할 조작으로 전환"
+              : "직접 조정으로 전환",
+          onPress: () => {
+            if (isFreePractice) {
+              setFreePracticeInputMode((currentMode) =>
+                currentMode === "handles" ? "quadrants" : "handles",
+              );
+              return;
+            }
+
+            if (stepId === "directMode") {
+              advanceTutorial();
+            }
+          },
+        })}
+        {renderSpotlightButton({
+          disabled:
+            isFreePractice ? !historyState.canUndo : stepId !== "undo" || !historyState.canUndo,
+          icon: "arrow-undo",
+          isActive: !isFreePractice && stepId === "undo",
+          label: "방금 움직임 되돌리기",
+          onPress: () => {
+            if (isFreePractice) {
+              overlayRef.current?.undo();
+              return;
+            }
+
+            if (stepId === "undo") {
+              overlayRef.current?.undo();
+              advanceTutorial();
+            }
+          },
+        })}
+        {renderSpotlightButton({
+          disabled:
+            isFreePractice ? !historyState.canRedo : stepId !== "redo" || !historyState.canRedo,
+          icon: "arrow-redo",
+          isActive: !isFreePractice && stepId === "redo",
+          label: "되돌린 움직임 다시 실행",
+          onPress: () => {
+            if (isFreePractice) {
+              overlayRef.current?.redo();
+              return;
+            }
+
+            if (stepId === "redo") {
+              overlayRef.current?.redo();
+              advanceTutorial();
+            }
+          },
+        })}
+      </>
+    );
+  }
+
   function renderTutorialStage() {
     return (
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <View style={styles.tutorialScreen}>
           <View style={styles.tutorialChrome}>
-            {shouldStartAtTutorial ? (
-              <Pressable
-                accessibilityLabel="튜토리얼 나가기"
-                onPress={() => router.replace("/(tabs)/simulation")}
-                style={styles.exitButton}
-              >
-                <Ionicons color={brand.colors.text} name="close" size={22} />
-              </Pressable>
-            ) : null}
-
             <View style={styles.tutorialTitleWrap}>
               <Text style={styles.eyebrow}>Tutorial</Text>
               <Text style={styles.tutorialChromeTitle}>루파 조작 연습</Text>
             </View>
 
-            <View style={styles.tutorialActions} />
+            <View style={styles.tutorialActions}>
+              {renderTutorialChromeControls()}
+              <Pressable
+                accessibilityLabel="튜토리얼 나가기"
+                onPress={handleRequestExitTutorial}
+                style={styles.tutorialIconButton}
+              >
+                <Ionicons color={brand.colors.text} name="close" size={22} />
+              </Pressable>
+            </View>
           </View>
 
           <View onLayout={handleViewportLayout} style={styles.practiceCanvas}>
@@ -435,13 +627,21 @@ export default function OnboardingScreen() {
                 initialPoseVariant="standing"
                 mode="simulating"
                 onHistoryStateChange={setHistoryState}
+                onTutorialHandleStart={handleTutorialHandleStart}
                 onPoseChange={handlePoseChange}
                 onTutorialDragEnd={handleTutorialDragEnd}
                 onTutorialQuadrantStart={handleTutorialQuadrantStart}
                 simulationInputMode={simulationInputMode}
+                tutorialBodyOnly={isBodyTutorialStep}
+                tutorialDisableDirectHandles={shouldDisableDirectHandles}
+                tutorialDisableQuadrants={shouldDisableQuadrants}
+                tutorialDimDirectJoints={shouldDimDirectJoints}
                 tutorialDimInactiveQuadrants={
-                  activeTutorialEndpoint !== null && shouldPreviewEndpoint
+                  (activeTutorialEndpoint !== null && shouldPreviewEndpoint) ||
+                  shouldPreviewBody
                 }
+                tutorialDirectJointGroup={directJointTutorialGroup}
+                tutorialPreviewBody={shouldPreviewBody}
                 tutorialPreviewQuadrantEndpoint={
                   shouldPreviewEndpoint ? activeTutorialEndpoint : null
                 }
@@ -460,14 +660,85 @@ export default function OnboardingScreen() {
               />
             ) : null}
 
-            <View pointerEvents="none" style={styles.instructionOverlay}>
-              <View style={styles.instructionPanel}>
-                <Text style={styles.instructionStep}>
-                  {stepId === "complete" ? "완료" : currentStep.title}
-                </Text>
-                <Text style={styles.instructionBody}>{instructionBody}</Text>
+            {stepId === "undo" ||
+            stepId === "redo" ||
+            stepId === "directMode" ? (
+              <View pointerEvents="none" style={styles.actionDimLayer} />
+            ) : null}
+
+            {shouldShowCompletionPanel ? (
+              <View style={styles.completionLayer}>
+                <View style={styles.completionPanel}>
+                  <Text style={styles.completionTitle}>{currentStep.title}</Text>
+                  <Text style={styles.completionBody}>{currentStep.body}</Text>
+                  <View style={styles.completionActions}>
+                    <Pressable
+                      accessibilityLabel="자유롭게 움직여보기"
+                      onPress={handleStartFreePractice}
+                      style={styles.completionPrimaryButton}
+                    >
+                      <Text style={styles.completionPrimaryButtonText}>
+                        자유롭게 움직여보기
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="튜토리얼 나가기"
+                      onPress={handleRequestExitTutorial}
+                      style={styles.completionSecondaryButton}
+                    >
+                      <Text style={styles.completionSecondaryButtonText}>
+                        나가기
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
-            </View>
+            ) : null}
+
+            {shouldShowInstructionPanel ? (
+              <View pointerEvents="none" style={styles.instructionOverlay}>
+                <View style={styles.instructionPanel}>
+                  <Text style={styles.instructionStep}>{currentStep.title}</Text>
+                  <Text style={styles.instructionBody}>{instructionBody}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <Modal
+              animationType="fade"
+              onRequestClose={handleCancelExitTutorial}
+              transparent
+              visible={isExitConfirmVisible}
+            >
+              <View style={styles.exitModalLayer}>
+                <View style={styles.exitModalPanel}>
+                  <Text style={styles.exitModalTitle}>튜토리얼을 나갈까요?</Text>
+                  <Text style={styles.exitModalBody}>
+                    조작 연습은 나중에 다시 볼 수 있어요.
+                  </Text>
+                  <View style={styles.exitModalActions}>
+                    <Pressable
+                      accessibilityLabel="튜토리얼 계속하기"
+                      onPress={handleCancelExitTutorial}
+                      style={styles.exitModalSecondaryButton}
+                    >
+                      <Text style={styles.exitModalSecondaryButtonText}>
+                        계속하기
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="튜토리얼 나가기 확인"
+                      onPress={handleConfirmExitTutorial}
+                      style={styles.exitModalPrimaryButton}
+                    >
+                      <Text style={styles.exitModalPrimaryButtonText}>
+                        나가기
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            </Modal>
           </View>
         </View>
       </SafeAreaView>
@@ -600,6 +871,7 @@ const styles = StyleSheet.create({
     backgroundColor: brand.colors.wall,
   },
   tutorialChrome: {
+    zIndex: 22,
     minHeight: 74,
     flexDirection: "row",
     alignItems: "center",
@@ -610,16 +882,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(37,29,21,0.12)",
     backgroundColor: brand.colors.wall,
-  },
-  exitButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(37,29,21,0.14)",
-    borderRadius: 22,
-    backgroundColor: "rgba(255,244,223,0.52)",
   },
   tutorialTitleWrap: {
     flex: 1,
@@ -656,6 +918,11 @@ const styles = StyleSheet.create({
       height: 0,
     },
     elevation: 8,
+  },
+  actionDimLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 12,
+    backgroundColor: "rgba(15,15,15,0.34)",
   },
   tutorialIconButtonDisabled: {
     opacity: 0.34,
@@ -695,5 +962,127 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "900",
     lineHeight: 23,
+  },
+  completionLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    backgroundColor: "rgba(15,15,15,0.42)",
+  },
+  completionPanel: {
+    width: "100%",
+    maxWidth: 420,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    borderRadius: 18,
+    backgroundColor: "rgba(12,12,12,0.82)",
+  },
+  completionTitle: {
+    color: brand.colors.accent,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  completionBody: {
+    marginTop: 8,
+    color: "#ffffff",
+    fontSize: 20,
+    fontWeight: "900",
+    lineHeight: 27,
+  },
+  completionActions: {
+    marginTop: 18,
+    gap: 10,
+  },
+  completionPrimaryButton: {
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: brand.colors.primary,
+  },
+  completionPrimaryButtonText: {
+    color: brand.colors.primaryText,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  completionSecondaryButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  completionSecondaryButtonText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  exitModalLayer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 22,
+    backgroundColor: "rgba(15,15,15,0.5)",
+  },
+  exitModalPanel: {
+    width: "100%",
+    maxWidth: 360,
+    paddingHorizontal: 18,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderRadius: 18,
+    backgroundColor: "#fff8e7",
+  },
+  exitModalTitle: {
+    color: brand.colors.text,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  exitModalBody: {
+    marginTop: 8,
+    color: brand.colors.mutedText,
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  exitModalActions: {
+    marginTop: 18,
+    flexDirection: "row",
+    gap: 10,
+  },
+  exitModalSecondaryButton: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(37,29,21,0.14)",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.58)",
+  },
+  exitModalSecondaryButtonText: {
+    color: brand.colors.text,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  exitModalPrimaryButton: {
+    minHeight: 48,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: brand.colors.primary,
+  },
+  exitModalPrimaryButtonText: {
+    color: brand.colors.primaryText,
+    fontSize: 15,
+    fontWeight: "900",
   },
 });

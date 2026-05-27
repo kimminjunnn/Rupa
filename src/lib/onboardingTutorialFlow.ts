@@ -15,7 +15,9 @@ export type OnboardingTutorialStepId =
   | "undo"
   | "redo"
   | "directMode"
-  | "dropKnee"
+  | "neckJoint"
+  | "elbowJoint"
+  | "kneeJoint"
   | "complete";
 
 export type OnboardingTutorialTarget =
@@ -96,16 +98,30 @@ export const ONBOARDING_TUTORIAL_STEPS: OnboardingTutorialStep[] = [
     inputMode: "handles",
   },
   {
-    id: "dropKnee",
-    title: "드롭니 만들기",
-    body: "무릎을 안쪽으로 넣어 드롭니 자세를 만들 수 있어요.",
-    target: { kind: "joint", id: "rightKnee" },
+    id: "neckJoint",
+    title: "목 조정하기",
+    body: "목을 움직여 시선과 상체 방향을 조정해보세요.",
+    target: null,
+    inputMode: "handles",
+  },
+  {
+    id: "elbowJoint",
+    title: "팔꿈치 조정하기",
+    body: "팔꿈치를 움직여 팔의 방향을 더 정교하게 조정해보세요.",
+    target: null,
+    inputMode: "handles",
+  },
+  {
+    id: "kneeJoint",
+    title: "무릎 조정하기",
+    body: "무릎을 움직여 다리 방향을 조정해보세요.",
+    target: null,
     inputMode: "handles",
   },
   {
     id: "complete",
     title: "연습 완료",
-    body: "이제 벽 사진으로 시작해보세요.",
+    body: "루파의 기본 조작을 모두 익혔어요.",
     target: null,
     inputMode: "handles",
   },
@@ -116,7 +132,6 @@ export type TutorialTargetLayout = {
   leftFootHold: Point2D;
   rightFootHold: Point2D;
   bodyCenter: Point2D;
-  dropKnee: Point2D;
 };
 
 export function createOnboardingTutorialTargetLayout(
@@ -128,7 +143,6 @@ export function createOnboardingTutorialTargetLayout(
     leftFootHold: { x: width * 0.43, y: height * 0.53 },
     rightFootHold: { x: width * (1 - 0.43), y: height * 0.53 },
     bodyCenter: { x: width * 0.56, y: height * 0.42 },
-    dropKnee: { x: width * 0.43, y: height * 0.55 },
   };
 }
 
@@ -146,11 +160,12 @@ export function getTargetPointForStep(
       return layout.rightFootHold;
     case "body":
       return layout.bodyCenter;
-    case "dropKnee":
-      return layout.dropKnee;
     case "undo":
     case "redo":
     case "directMode":
+    case "neckJoint":
+    case "elbowJoint":
+    case "kneeJoint":
     case "welcome":
     case "complete":
       return null;
