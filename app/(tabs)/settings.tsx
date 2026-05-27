@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -163,17 +164,16 @@ export default function SettingsScreen() {
           showsVerticalScrollIndicator={false}
           style={styles.scrollView}
         >
-          <View style={styles.introPanel}>
-            <View style={styles.introIcon}>
-              <Ionicons
-                color={brand.colors.primaryText}
-                name="body-outline"
-                size={22}
-              />
-            </View>
-            <View style={styles.introCopy}>
-              <Text style={styles.introTitle}>신체 정보 설정</Text>
-              <Text style={styles.introBody}>
+          <View style={styles.settingsHeader}>
+            <Image
+              accessibilityLabel="Rupa"
+              resizeMode="contain"
+              source={require("../../assets/rupa-logo.png")}
+              style={styles.settingsLogo}
+            />
+            <View style={styles.settingsHeaderCopy}>
+              <Text style={styles.settingsTitle}>신체 정보</Text>
+              <Text style={styles.settingsBody}>
                 손발 위치를 맞출 때 쓰는 기준값이에요.
               </Text>
             </View>
@@ -332,46 +332,35 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 18,
+    paddingTop: 24,
     paddingBottom: 108,
     gap: 14,
   },
-  introPanel: {
+  settingsHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: brand.colors.border,
-    backgroundColor: "rgba(255, 248, 231, 0.9)",
+    paddingHorizontal: 4,
+    paddingBottom: 4,
   },
-  introIcon: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 48,
-    height: 48,
-    borderWidth: 1,
-    borderColor: brand.colors.border,
-    borderRadius: 16,
-    backgroundColor: brand.colors.primarySoft,
+  settingsLogo: {
+    width: 82,
+    height: 38,
   },
-  introCopy: {
+  settingsHeaderCopy: {
     flex: 1,
-    gap: 6,
+    gap: 2,
   },
-  introTitle: {
+  settingsTitle: {
     color: brand.colors.text,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
-    lineHeight: 30,
-    letterSpacing: -0.6,
+    lineHeight: 27,
   },
-  introBody: {
+  settingsBody: {
     color: brand.colors.mutedText,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: "500",
   },
   fieldCard: {

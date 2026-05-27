@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BottomTabBar } from "./BottomTabBar";
@@ -39,6 +46,13 @@ export function SimulationInputStage({
           style={styles.scrollView}
         >
           <View style={styles.topActionRow}>
+            <Image
+              accessibilityLabel="Rupa"
+              resizeMode="contain"
+              source={require("../../assets/rupa-logo.png")}
+              style={styles.headerLogo}
+            />
+
             <Pressable
               accessibilityLabel="시뮬레이션 메뉴 열기"
               onPress={onOpenMenu}
@@ -49,8 +63,6 @@ export function SimulationInputStage({
           </View>
 
           <View style={styles.heroCopy}>
-            <Text style={styles.heroEyebrow}>Rupa</Text>
-            <Text style={styles.heroTitle}>새 시뮬레이션</Text>
             <Text style={styles.heroBody}>
               사진 위에서 당신의 무브를 시도해보세요
             </Text>
@@ -159,7 +171,8 @@ const styles = StyleSheet.create({
   },
   topActionRow: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   menuButton: {
     alignItems: "center",
@@ -171,18 +184,9 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     backgroundColor: "rgba(255, 244, 223, 0.52)",
   },
-  heroEyebrow: {
-    color: brand.colors.inactive,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.8,
-    textTransform: "uppercase",
-  },
-  heroTitle: {
-    color: brand.colors.text,
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 36,
+  headerLogo: {
+    width: 98,
+    height: 46,
   },
   heroBody: {
     color: brand.colors.mutedText,

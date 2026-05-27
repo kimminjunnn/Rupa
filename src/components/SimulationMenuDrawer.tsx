@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { brand } from "../theme/brand";
@@ -58,10 +58,12 @@ export function SimulationMenuDrawer({
         <SafeAreaView edges={["top", "bottom"]} style={styles.drawerSafeArea}>
           <View style={styles.drawer}>
             <View style={styles.header}>
-              <View>
-                <Text style={styles.eyebrow}>Rupa</Text>
-                <Text style={styles.title}>시뮬레이션 메뉴</Text>
-              </View>
+              <Image
+                accessibilityLabel="Rupa"
+                resizeMode="contain"
+                source={require("../../assets/rupa-logo.png")}
+                style={styles.drawerLogo}
+              />
 
               <Pressable
                 accessibilityLabel="메뉴 닫기"
@@ -135,18 +137,9 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 18,
   },
-  eyebrow: {
-    color: brand.colors.inactive,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-  },
-  title: {
-    marginTop: 4,
-    color: brand.colors.text,
-    fontSize: 23,
-    fontWeight: "900",
+  drawerLogo: {
+    width: 94,
+    height: 44,
   },
   closeButton: {
     width: 44,

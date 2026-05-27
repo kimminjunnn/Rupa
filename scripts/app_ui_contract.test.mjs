@@ -130,6 +130,8 @@ test("simulation start screen balances primary action with body context", async 
   assert.match(source, /profile\.wingspan/);
   assert.match(source, /styles\.profileStrip/);
   assert.doesNotMatch(source, /직접 입력/);
+  assert.match(source, /styles\.headerLogo/);
+  assert.doesNotMatch(source, /<Text style=\{styles\.heroTitle\}>새 시뮬레이션<\/Text>/);
   assert.match(source, /minHeight: 300/);
   assert.doesNotMatch(source, /minHeight: 360/);
 });
@@ -243,10 +245,13 @@ test("settings screen keeps the profile form visually organized", async () => {
   assert.doesNotMatch(source, /placeholderTextColor/);
   assert.doesNotMatch(source, /키 기준으로 자동 계산돼요/);
   assert.doesNotMatch(source, /키를 입력하면 자동 계산돼요/);
-  assert.match(source, /styles\.introPanel/);
-  assert.match(source, /styles\.introIcon/);
+  assert.doesNotMatch(source, /styles\.introPanel/);
+  assert.doesNotMatch(source, /styles\.introIcon/);
+  assert.match(source, /styles\.settingsHeader/);
+  assert.match(source, /styles\.settingsLogo/);
+  assert.doesNotMatch(source, /fontSize: 30/);
   assert.match(source, /backgroundColor: "rgba\(255, 248, 231, 0\.9\)"/);
-  assert.match(source, /borderColor: "rgba\(37, 29, 21, 0\.1\)"/);
+  assert.match(source, /borderColor: brand\.colors\.border/);
 });
 
 test("bottom tab bar stays compact and avoids the blue accent palette", async () => {
@@ -336,7 +341,10 @@ test("settings screen presents body fields as the primary work surface", async (
 
   assert.doesNotMatch(source, /styles\.heroCard/);
   assert.doesNotMatch(source, /BODY PROFILE/);
-  assert.match(source, /styles\.introCopy/);
+  assert.doesNotMatch(source, /styles\.introPanel/);
+  assert.match(source, /require\("\.\.\/\.\.\/assets\/rupa-logo\.png"\)/);
+  assert.match(source, /styles\.settingsHeader/);
+  assert.match(source, /styles\.settingsLogo/);
 });
 
 test("settings save modal uses a quieter confirm button tone", async () => {
