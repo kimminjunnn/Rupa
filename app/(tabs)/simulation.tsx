@@ -125,18 +125,11 @@ export default function SimulationScreen() {
 
   if (mode === "canvas" && photo && transform) {
     return (
-      <>
-        <SimulationCanvasStage
-          onClearPhoto={clearPhoto}
-          onOpenMenu={() => setIsMenuVisible(true)}
-          photo={photo}
-          transform={transform}
-        />
-        <SimulationMenuDrawer
-          onClose={() => setIsMenuVisible(false)}
-          visible={isMenuVisible}
-        />
-      </>
+      <SimulationCanvasStage
+        onClearPhoto={clearPhoto}
+        photo={photo}
+        transform={transform}
+      />
     );
   }
 

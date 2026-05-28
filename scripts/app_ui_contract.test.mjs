@@ -270,6 +270,7 @@ test("simulation canvas icon actions are accessible and large enough to tap", as
 
   assert.doesNotMatch(source, /accessibilityLabel="새 벽 사진 촬영"/);
   assert.doesNotMatch(source, /accessibilityLabel="갤러리에서 벽 사진 선택"/);
+  assert.doesNotMatch(source, /accessibilityLabel="시뮬레이션 메뉴 열기"/);
   assert.match(source, /accessibilityLabel="현재 벽 사진 닫기"/);
   assert.match(source, /width: 44/);
   assert.match(source, /height: 44/);

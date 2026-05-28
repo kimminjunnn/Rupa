@@ -52,7 +52,6 @@ type SimulationCanvasStageProps = {
   photo: SimulationPhoto;
   transform: SimulationPhotoTransform;
   onClearPhoto: () => void;
-  onOpenMenu: () => void;
 };
 
 type CanvasFlowStep =
@@ -70,7 +69,6 @@ export function SimulationCanvasStage({
   photo,
   transform,
   onClearPhoto,
-  onOpenMenu,
 }: SimulationCanvasStageProps) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -864,14 +862,6 @@ export function SimulationCanvasStage({
             />
 
             <View style={styles.canvasChromeActions}>
-              <Pressable
-                accessibilityLabel="시뮬레이션 메뉴 열기"
-                onPress={onOpenMenu}
-                style={styles.overlayIconButton}
-              >
-                <Ionicons color={brand.colors.text} name="menu" size={22} />
-              </Pressable>
-
               {flowStep === "simulating" ? (
                 <Pressable
                   accessibilityLabel={
