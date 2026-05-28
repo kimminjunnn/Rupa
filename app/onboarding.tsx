@@ -26,9 +26,12 @@ import {
 } from "../src/components/SkeletonPoseOverlay";
 import {
   createOnboardingTutorialTargetLayout,
+  getSkeletonBodyCenter,
   getNextOnboardingTutorialStepId,
   getOnboardingTutorialStep,
+  isTutorialBodyDirectionReached,
   isTutorialStepTargetReached,
+  type OnboardingTutorialBodyDirection,
   type OnboardingTutorialStepId,
 } from "../src/lib/onboardingTutorialFlow";
 import {
@@ -51,6 +54,7 @@ import type {
 } from "../src/types/skeletonPose";
 
 const TARGET_RADIUS = 24;
+const BODY_DIRECTION_MIN_DISTANCE = 32;
 const HOLD_RADIUS = 12;
 const PROFILE_PREVIEW_WIDTH = 260;
 const PROFILE_PREVIEW_HEIGHT = 220;
@@ -90,6 +94,8 @@ export default function OnboardingScreen() {
   );
   const overlayRef = useRef<SkeletonPoseOverlayHandle>(null);
   const completedStepRef = useRef<OnboardingTutorialStepId | null>(null);
+  const latestPoseRef = useRef<SkeletonPose | null>(null);
+  const bodyDragStartCenterRef = useRef<{ x: number; y: number } | null>(null);
   const [historyState, setHistoryState] =
     useState<SkeletonPoseOverlayHistoryState>({
       canRedo: false,
@@ -128,6 +134,8 @@ export default function OnboardingScreen() {
   const activeTutorialEndpoint =
     currentStep.target?.kind === "endpoint" ? currentStep.target.id : null;
   const isBodyTutorialStep = currentStep.target?.kind === "body";
+  const bodyTutorialDirection: OnboardingTutorialBodyDirection | null =
+    currentStep.target?.kind === "body" ? currentStep.target.direction : null;
   const directJointTutorialGroup = getDirectJointTutorialGroup(stepId);
   const isDirectJointTutorialStep = directJointTutorialGroup !== null;
   const isQuadrantTutorialStep =
@@ -141,7 +149,7 @@ export default function OnboardingScreen() {
     !isFreePractice && (isHeaderOnlyTutorialStep || isDirectJointTutorialStep);
   const shouldPreviewEndpoint =
     activeTutorialEndpoint !== null && !startedEndpointSteps[stepId];
-  const shouldPreviewBody = isBodyTutorialStep && !startedEndpointSteps[stepId];
+  const shouldPreviewBody = isBodyTutorialStep;
   const shouldDimDirectJoints =
     !isFreePractice &&
     isDirectJointTutorialStep &&
@@ -262,6 +270,7 @@ export default function OnboardingScreen() {
     }
 
     reachedStepRef.current = null;
+    bodyDragStartCenterRef.current = null;
     setStepId(nextStepId);
   }
 
@@ -290,7 +299,27 @@ export default function OnboardingScreen() {
   }
 
   function handlePoseChange(pose: SkeletonPose) {
+    latestPoseRef.current = pose;
+
     if (!targetLayout || currentStep.target === null) {
+      return;
+    }
+
+    if (currentStep.target.kind === "body") {
+      const startCenter = bodyDragStartCenterRef.current;
+
+      if (
+        startCenter &&
+        isTutorialBodyDirectionReached({
+          currentPose: pose,
+          direction: currentStep.target.direction,
+          minDistance: BODY_DIRECTION_MIN_DISTANCE,
+          startCenter,
+        })
+      ) {
+        reachedStepRef.current = stepId;
+      }
+
       return;
     }
 
@@ -335,7 +364,8 @@ export default function OnboardingScreen() {
       stepId === "rightHandMatch" ||
       stepId === "leftFoot" ||
       stepId === "rightFoot" ||
-      stepId === "body"
+      stepId === "bodyLeft" ||
+      stepId === "bodyRight"
     ) {
       completedStepRef.current = stepId;
       advanceTutorial();
@@ -368,6 +398,12 @@ export default function OnboardingScreen() {
       ...currentSteps,
       [stepId]: true,
     }));
+
+    if (target === "body" && latestPoseRef.current) {
+      bodyDragStartCenterRef.current = getSkeletonBodyCenter(
+        latestPoseRef.current,
+      );
+    }
   }
 
   function renderProfileStage() {
@@ -539,7 +575,8 @@ export default function OnboardingScreen() {
         {[
           "leftFoot",
           "rightFoot",
-          "body",
+          "bodyLeft",
+          "bodyRight",
           "undo",
           "redo",
           "directMode",
@@ -558,7 +595,8 @@ export default function OnboardingScreen() {
 
         {[
           "rightFoot",
-          "body",
+          "bodyLeft",
+          "bodyRight",
           "undo",
           "redo",
           "directMode",
@@ -743,6 +781,7 @@ export default function OnboardingScreen() {
                   shouldPreviewBody
                 }
                 tutorialDirectJointGroup={directJointTutorialGroup}
+                tutorialBodyDirection={bodyTutorialDirection}
                 tutorialPreviewBody={shouldPreviewBody}
                 tutorialPreviewQuadrantEndpoint={
                   shouldPreviewEndpoint ? activeTutorialEndpoint : null

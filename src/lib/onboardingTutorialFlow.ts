@@ -11,7 +11,8 @@ export type OnboardingTutorialStepId =
   | "rightHandMatch"
   | "leftFoot"
   | "rightFoot"
-  | "body"
+  | "bodyLeft"
+  | "bodyRight"
   | "undo"
   | "redo"
   | "directMode"
@@ -20,9 +21,11 @@ export type OnboardingTutorialStepId =
   | "kneeJoint"
   | "complete";
 
+export type OnboardingTutorialBodyDirection = "left" | "right";
+
 export type OnboardingTutorialTarget =
   | { kind: "endpoint"; id: SkeletonEndpointName }
-  | { kind: "body" }
+  | { kind: "body"; direction: OnboardingTutorialBodyDirection }
   | { kind: "joint"; id: SkeletonControlJointName };
 
 export type OnboardingTutorialStep = {
@@ -70,10 +73,17 @@ export const ONBOARDING_TUTORIAL_STEPS: OnboardingTutorialStep[] = [
     inputMode: "quadrants",
   },
   {
-    id: "body",
+    id: "bodyLeft",
     title: "중심 옮기기",
-    body: "몸통을 움직여 중심을 바꿀 수 있어요.",
-    target: { kind: "body" },
+    body: "몸통을 잡고 왼쪽으로 움직여보세요.",
+    target: { kind: "body", direction: "left" },
+    inputMode: "quadrants",
+  },
+  {
+    id: "bodyRight",
+    title: "중심 옮기기",
+    body: "이번엔 몸통을 오른쪽으로 움직여보세요.",
+    target: { kind: "body", direction: "right" },
     inputMode: "quadrants",
   },
   {
@@ -131,7 +141,6 @@ export type TutorialTargetLayout = {
   handHold: Point2D;
   leftFootHold: Point2D;
   rightFootHold: Point2D;
-  bodyCenter: Point2D;
 };
 
 export function createOnboardingTutorialTargetLayout(
@@ -142,7 +151,6 @@ export function createOnboardingTutorialTargetLayout(
     handHold: { x: width * 0.5, y: height * 0.34 },
     leftFootHold: { x: width * 0.43, y: height * 0.53 },
     rightFootHold: { x: width * (1 - 0.43), y: height * 0.53 },
-    bodyCenter: { x: width * 0.56, y: height * 0.42 },
   };
 }
 
@@ -158,8 +166,9 @@ export function getTargetPointForStep(
       return layout.leftFootHold;
     case "rightFoot":
       return layout.rightFootHold;
-    case "body":
-      return layout.bodyCenter;
+    case "bodyLeft":
+    case "bodyRight":
+      return null;
     case "undo":
     case "redo":
     case "directMode":
@@ -177,6 +186,23 @@ export function getSkeletonBodyCenter(pose: SkeletonPose): Point2D {
     x: (pose.joints.torso.x + pose.joints.pelvis.x) / 2,
     y: (pose.joints.torso.y + pose.joints.pelvis.y) / 2,
   };
+}
+
+export function isTutorialBodyDirectionReached({
+  currentPose,
+  direction,
+  minDistance,
+  startCenter,
+}: {
+  currentPose: SkeletonPose;
+  direction: OnboardingTutorialBodyDirection;
+  minDistance: number;
+  startCenter: Point2D;
+}) {
+  const currentCenter = getSkeletonBodyCenter(currentPose);
+  const deltaX = currentCenter.x - startCenter.x;
+
+  return direction === "left" ? deltaX <= -minDistance : deltaX >= minDistance;
 }
 
 function getDistance(first: Point2D, second: Point2D) {

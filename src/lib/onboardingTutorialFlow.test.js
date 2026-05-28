@@ -6,8 +6,10 @@ const test = require("node:test");
 const {
   ONBOARDING_TUTORIAL_STEPS,
   createOnboardingTutorialTargetLayout,
+  getSkeletonBodyCenter,
   getNextOnboardingTutorialStepId,
   getOnboardingTutorialStep,
+  isTutorialBodyDirectionReached,
   isTutorialStepTargetReached,
 } = require("./onboardingTutorialFlow.ts");
 
@@ -44,7 +46,8 @@ test("defines the onboarding tutorial sequence from matching hands through direc
       "rightHandMatch",
       "leftFoot",
       "rightFoot",
-      "body",
+      "bodyLeft",
+      "bodyRight",
       "undo",
       "redo",
       "directMode",
@@ -63,7 +66,9 @@ test("defines the onboarding tutorial sequence from matching hands through direc
 test("advances to the next tutorial step without delay when the target is reached", () => {
   assert.equal(getNextOnboardingTutorialStepId("welcome"), "leftHand");
   assert.equal(getNextOnboardingTutorialStepId("leftHand"), "rightHandMatch");
-  assert.equal(getNextOnboardingTutorialStepId("rightFoot"), "body");
+  assert.equal(getNextOnboardingTutorialStepId("rightFoot"), "bodyLeft");
+  assert.equal(getNextOnboardingTutorialStepId("bodyLeft"), "bodyRight");
+  assert.equal(getNextOnboardingTutorialStepId("bodyRight"), "undo");
   assert.equal(getNextOnboardingTutorialStepId("directMode"), "neckJoint");
   assert.equal(getNextOnboardingTutorialStepId("neckJoint"), "elbowJoint");
   assert.equal(getNextOnboardingTutorialStepId("elbowJoint"), "kneeJoint");
@@ -100,13 +105,11 @@ test("uses one shared head-height hold for left hand and right hand matching", (
   );
 });
 
-test("checks foot and body targets against their active control only", () => {
+test("checks foot targets against their active control only", () => {
   const layout = createOnboardingTutorialTargetLayout(400, 700);
   const pose = createPose({
     leftFoot: layout.leftFootHold,
     rightFoot: layout.rightFootHold,
-    torso: { x: layout.bodyCenter.x, y: layout.bodyCenter.y - 30 },
-    pelvis: { x: layout.bodyCenter.x, y: layout.bodyCenter.y + 30 },
   });
 
   assert.equal(
@@ -132,16 +135,64 @@ test("checks foot and body targets against their active control only", () => {
       layout,
       pose,
       radius: 18,
-      step: getOnboardingTutorialStep("body"),
+      step: getOnboardingTutorialStep("kneeJoint"),
+    }),
+    false,
+  );
+});
+
+test("checks body direction targets against movement from the drag start center", () => {
+  const startPose = createPose({
+    torso: { x: 200, y: 190 },
+    pelvis: { x: 200, y: 250 },
+  });
+  const startCenter = getSkeletonBodyCenter(startPose);
+  const leftPose = createPose({
+    torso: { x: 167, y: 190 },
+    pelvis: { x: 167, y: 250 },
+  });
+  const rightPose = createPose({
+    torso: { x: 233, y: 190 },
+    pelvis: { x: 233, y: 250 },
+  });
+  const smallLeftPose = createPose({
+    torso: { x: 181, y: 190 },
+    pelvis: { x: 181, y: 250 },
+  });
+
+  assert.equal(
+    isTutorialBodyDirectionReached({
+      currentPose: leftPose,
+      direction: "left",
+      minDistance: 32,
+      startCenter,
     }),
     true,
   );
   assert.equal(
-    isTutorialStepTargetReached({
-      layout,
-      pose,
-      radius: 18,
-      step: getOnboardingTutorialStep("kneeJoint"),
+    isTutorialBodyDirectionReached({
+      currentPose: rightPose,
+      direction: "right",
+      minDistance: 32,
+      startCenter,
+    }),
+    true,
+  );
+  assert.equal(
+    isTutorialBodyDirectionReached({
+      currentPose: smallLeftPose,
+      direction: "left",
+      minDistance: 32,
+      startCenter,
+    }),
+    false,
+  );
+  assert.equal(
+    isTutorialBodyDirectionReached({
+      currentPose: leftPose,
+      direction: "right",
+      minDistance: 32,
+      startCenter,
     }),
     false,
   );

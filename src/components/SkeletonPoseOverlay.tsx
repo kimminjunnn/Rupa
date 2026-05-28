@@ -104,6 +104,7 @@ type SkeletonPoseOverlayProps = {
   onTutorialDragEnd?: (target: SkeletonDragTarget | null) => void;
   onTutorialQuadrantStart?: (target: "body" | SkeletonEndpointName) => void;
   simulationInputMode?: "quadrants" | "handles";
+  tutorialBodyDirection?: "left" | "right" | null;
   tutorialBodyOnly?: boolean;
   tutorialDirectJointGroup?: "neck" | "elbows" | "knees" | null;
   tutorialDisableDirectHandles?: boolean;
@@ -354,6 +355,7 @@ export const SkeletonPoseOverlay = forwardRef<
     onTutorialDragEnd,
     onTutorialQuadrantStart,
     simulationInputMode = "handles",
+    tutorialBodyDirection = null,
     tutorialBodyOnly = false,
     tutorialDirectJointGroup = null,
     tutorialDisableDirectHandles = false,
@@ -1618,21 +1620,32 @@ export const SkeletonPoseOverlay = forwardRef<
           {tutorialDimInactiveQuadrants &&
           (tutorialPreviewQuadrantEndpoint || tutorialPreviewBody) ? (
             <View pointerEvents="none" style={styles.tutorialQuadrantShade}>
-              {(tutorialPreviewBody
-                ? ENDPOINTS
-                : ENDPOINTS.filter(
-                    (endpointName) =>
-                      endpointName !== tutorialPreviewQuadrantEndpoint,
-                  )
-              ).map((endpointName) => (
+              {tutorialPreviewBody && tutorialBodyDirection ? (
                 <View
-                  key={endpointName}
                   style={[
-                    styles.tutorialDimmedQuadrant,
-                    getQuadrantHintPosition(endpointName),
+                    styles.tutorialDimmedBodySide,
+                    tutorialBodyDirection === "left"
+                      ? styles.tutorialDimmedBodyRight
+                      : styles.tutorialDimmedBodyLeft,
                   ]}
                 />
-              ))}
+              ) : (
+                (tutorialPreviewBody
+                  ? ENDPOINTS
+                  : ENDPOINTS.filter(
+                      (endpointName) =>
+                        endpointName !== tutorialPreviewQuadrantEndpoint,
+                    )
+                ).map((endpointName) => (
+                  <View
+                    key={endpointName}
+                    style={[
+                      styles.tutorialDimmedQuadrant,
+                      getQuadrantHintPosition(endpointName),
+                    ]}
+                  />
+                ))
+              )}
               {tutorialPreviewQuadrantEndpoint ? (
                 <View
                   style={[
@@ -1641,7 +1654,16 @@ export const SkeletonPoseOverlay = forwardRef<
                   ]}
                 />
               ) : null}
-              {tutorialPreviewBody ? (
+              {tutorialPreviewBody && tutorialBodyDirection ? (
+                <View
+                  style={[
+                    styles.tutorialHighlightedBodySide,
+                    tutorialBodyDirection === "left"
+                      ? styles.tutorialHighlightedBodyLeft
+                      : styles.tutorialHighlightedBodyRight,
+                  ]}
+                />
+              ) : tutorialPreviewBody ? (
                 <View style={styles.tutorialHighlightedBody} />
               ) : null}
             </View>
@@ -1732,6 +1754,19 @@ const styles = StyleSheet.create({
     height: "50%",
     backgroundColor: "rgba(15,15,15,0.34)",
   },
+  tutorialDimmedBodySide: {
+    position: "absolute",
+    top: 0,
+    width: "50%",
+    height: "100%",
+    backgroundColor: "rgba(15,15,15,0.34)",
+  },
+  tutorialDimmedBodyLeft: {
+    left: 0,
+  },
+  tutorialDimmedBodyRight: {
+    right: 0,
+  },
   tutorialHighlightedQuadrant: {
     position: "absolute",
     width: "50%",
@@ -1752,6 +1787,23 @@ const styles = StyleSheet.create({
     borderColor: "rgba(254,214,96,0.72)",
     borderRadius: QUADRANT_CORE_HANDLE_RADIUS,
     backgroundColor: "rgba(254,214,96,0.08)",
+  },
+  tutorialHighlightedBodySide: {
+    position: "absolute",
+    top: 0,
+    width: "50%",
+    height: "100%",
+    borderWidth: 2,
+    borderColor: "rgba(254,214,96,0.72)",
+    backgroundColor: "rgba(254,214,96,0.06)",
+  },
+  tutorialHighlightedBodyLeft: {
+    left: 0,
+    borderRightWidth: 0,
+  },
+  tutorialHighlightedBodyRight: {
+    right: 0,
+    borderLeftWidth: 0,
   },
   quadrantCoreHandle: {
     position: "absolute",
