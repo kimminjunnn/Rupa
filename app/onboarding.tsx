@@ -2,12 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   LayoutChangeEvent,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -68,14 +73,14 @@ export default function OnboardingScreen() {
     shouldStartAtTutorial ? "tutorial" : "profile",
   );
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const [stepId, setStepId] =
-    useState<OnboardingTutorialStepId>("welcome");
+  const [stepId, setStepId] = useState<OnboardingTutorialStepId>("welcome");
   const [startedEndpointSteps, setStartedEndpointSteps] = useState<
     Partial<Record<OnboardingTutorialStepId, boolean>>
   >({});
   const [isFreePractice, setIsFreePractice] = useState(false);
-  const [freePracticeInputMode, setFreePracticeInputMode] =
-    useState<"quadrants" | "handles">("handles");
+  const [freePracticeInputMode, setFreePracticeInputMode] = useState<
+    "quadrants" | "handles"
+  >("handles");
   const [isExitConfirmVisible, setIsExitConfirmVisible] = useState(false);
   const [heightError, setHeightError] = useState<string | null>(null);
   const [wingspanError, setWingspanError] = useState<string | null>(null);
@@ -281,10 +286,12 @@ export default function OnboardingScreen() {
     }
   }
 
-  function handleTutorialDragEnd(target: {
-    kind: string;
-    id?: string;
-  } | null) {
+  function handleTutorialDragEnd(
+    target: {
+      kind: string;
+      id?: string;
+    } | null,
+  ) {
     if (
       directJointTutorialGroup &&
       isDirectJointTutorialTarget(directJointTutorialGroup, target)
@@ -329,10 +336,11 @@ export default function OnboardingScreen() {
     }));
   }
 
-  function handleTutorialQuadrantStart(
-    target: "body" | SkeletonEndpointName,
-  ) {
-    if (target !== activeTutorialEndpoint && target !== currentStep.target?.kind) {
+  function handleTutorialQuadrantStart(target: "body" | SkeletonEndpointName) {
+    if (
+      target !== activeTutorialEndpoint &&
+      target !== currentStep.target?.kind
+    ) {
       return;
     }
 
@@ -345,81 +353,101 @@ export default function OnboardingScreen() {
   function renderProfileStage() {
     return (
       <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
-        <View style={styles.profileScreen}>
-          <View style={styles.profileHeader}>
-            <Text style={styles.eyebrow}>Rupa Onboarding</Text>
-            <Text style={styles.profileTitle}>내 몸 기준부터 맞춰요</Text>
-            <Text style={styles.profileBody}>
-              입력한 키와 리치가 캐릭터 크기와 무브 거리의 기준이 됩니다.
-            </Text>
-          </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.profileKeyboardAvoider}
+        >
+          <TouchableWithoutFeedback
+            accessible={false}
+            onPress={Keyboard.dismiss}
+          >
+            <ScrollView
+              contentContainerStyle={styles.profileScreen}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.profileScrollView}
+            >
+              <View style={styles.profileHeader}>
+                <Text style={styles.eyebrow}>Rupa Onboarding</Text>
+                <Text style={styles.profileTitle}>내 몸 기준부터 맞춰요</Text>
+                <Text style={styles.profileBody}>
+                  입력한 키와 리치가 캐릭터 크기와 무브 거리의 기준이 됩니다.
+                </Text>
+              </View>
 
-          <View style={styles.formPanel}>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>키</Text>
-              <View
-                style={[
-                  styles.inputShell,
-                  heightError ? styles.inputShellInvalid : null,
-                ]}
+              <View style={styles.formPanel}>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>키</Text>
+                  <View
+                    style={[
+                      styles.inputShell,
+                      heightError ? styles.inputShellInvalid : null,
+                    ]}
+                  >
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={handleHeightChange}
+                      returnKeyType="done"
+                      style={styles.input}
+                      value={draftHeight}
+                    />
+                    <Text style={styles.unit}>cm</Text>
+                  </View>
+                  {heightError ? (
+                    <Text style={styles.errorText}>{heightError}</Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.fieldGroup}>
+                  <View style={styles.fieldHeaderRow}>
+                    <Text style={styles.label}>리치</Text>
+                    <Pressable
+                      onPress={handleRestoreAutoWingspan}
+                      style={styles.inlineAction}
+                    >
+                      <Ionicons
+                        color={brand.colors.primaryText}
+                        name="refresh"
+                        size={14}
+                      />
+                      <Text style={styles.inlineActionText}>자동 계산</Text>
+                    </Pressable>
+                  </View>
+                  <View
+                    style={[
+                      styles.inputShell,
+                      wingspanError ? styles.inputShellInvalid : null,
+                    ]}
+                  >
+                    <TextInput
+                      keyboardType="numeric"
+                      onChangeText={handleWingspanChange}
+                      returnKeyType="done"
+                      style={styles.input}
+                      value={draftWingspan}
+                    />
+                    <Text style={styles.unit}>cm</Text>
+                  </View>
+                  {wingspanError ? (
+                    <Text style={styles.errorText}>{wingspanError}</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <Pressable
+                onPress={handleSaveProfile}
+                style={styles.primaryButton}
               >
-                <TextInput
-                  keyboardType="numeric"
-                  onChangeText={handleHeightChange}
-                  style={styles.input}
-                  value={draftHeight}
+                <Text style={styles.primaryButtonText}>조작 연습하기</Text>
+                <Ionicons
+                  color={brand.colors.primaryText}
+                  name="arrow-forward"
+                  size={24}
                 />
-                <Text style={styles.unit}>cm</Text>
-              </View>
-              {heightError ? (
-                <Text style={styles.errorText}>{heightError}</Text>
-              ) : null}
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <View style={styles.fieldHeaderRow}>
-                <Text style={styles.label}>리치</Text>
-                <Pressable
-                  onPress={handleRestoreAutoWingspan}
-                  style={styles.inlineAction}
-                >
-                  <Ionicons
-                    color={brand.colors.primaryText}
-                    name="refresh"
-                    size={14}
-                  />
-                  <Text style={styles.inlineActionText}>자동 계산</Text>
-                </Pressable>
-              </View>
-              <View
-                style={[
-                  styles.inputShell,
-                  wingspanError ? styles.inputShellInvalid : null,
-                ]}
-              >
-                <TextInput
-                  keyboardType="numeric"
-                  onChangeText={handleWingspanChange}
-                  style={styles.input}
-                  value={draftWingspan}
-                />
-                <Text style={styles.unit}>cm</Text>
-              </View>
-              {wingspanError ? (
-                <Text style={styles.errorText}>{wingspanError}</Text>
-              ) : null}
-            </View>
-          </View>
-
-          <Pressable onPress={handleSaveProfile} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>조작 연습하기</Text>
-            <Ionicons
-              color={brand.colors.primaryText}
-              name="arrow-forward"
-              size={24}
-            />
-          </Pressable>
-        </View>
+              </Pressable>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -553,8 +581,9 @@ export default function OnboardingScreen() {
           },
         })}
         {renderSpotlightButton({
-          disabled:
-            isFreePractice ? !historyState.canUndo : stepId !== "undo" || !historyState.canUndo,
+          disabled: isFreePractice
+            ? !historyState.canUndo
+            : stepId !== "undo" || !historyState.canUndo,
           icon: "arrow-undo",
           isActive: !isFreePractice && stepId === "undo",
           label: "방금 움직임 되돌리기",
@@ -571,8 +600,9 @@ export default function OnboardingScreen() {
           },
         })}
         {renderSpotlightButton({
-          disabled:
-            isFreePractice ? !historyState.canRedo : stepId !== "redo" || !historyState.canRedo,
+          disabled: isFreePractice
+            ? !historyState.canRedo
+            : stepId !== "redo" || !historyState.canRedo,
           icon: "arrow-redo",
           isActive: !isFreePractice && stepId === "redo",
           label: "되돌린 움직임 다시 실행",
@@ -669,7 +699,9 @@ export default function OnboardingScreen() {
             {shouldShowCompletionPanel ? (
               <View style={styles.completionLayer}>
                 <View style={styles.completionPanel}>
-                  <Text style={styles.completionTitle}>{currentStep.title}</Text>
+                  <Text style={styles.completionTitle}>
+                    {currentStep.title}
+                  </Text>
                   <Text style={styles.completionBody}>{currentStep.body}</Text>
                   <View style={styles.completionActions}>
                     <Pressable
@@ -698,7 +730,9 @@ export default function OnboardingScreen() {
             {shouldShowInstructionPanel ? (
               <View pointerEvents="none" style={styles.instructionOverlay}>
                 <View style={styles.instructionPanel}>
-                  <Text style={styles.instructionStep}>{currentStep.title}</Text>
+                  <Text style={styles.instructionStep}>
+                    {currentStep.title}
+                  </Text>
                   <Text style={styles.instructionBody}>{instructionBody}</Text>
                 </View>
               </View>
@@ -712,7 +746,9 @@ export default function OnboardingScreen() {
             >
               <View style={styles.exitModalLayer}>
                 <View style={styles.exitModalPanel}>
-                  <Text style={styles.exitModalTitle}>튜토리얼을 나갈까요?</Text>
+                  <Text style={styles.exitModalTitle}>
+                    튜토리얼을 나갈까요?
+                  </Text>
                   <Text style={styles.exitModalBody}>
                     조작 연습은 나중에 다시 볼 수 있어요.
                   </Text>
@@ -753,8 +789,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brand.colors.wall,
   },
-  profileScreen: {
+  profileKeyboardAvoider: {
     flex: 1,
+  },
+  profileScrollView: {
+    flex: 1,
+    backgroundColor: brand.colors.wall,
+  },
+  profileScreen: {
+    flexGrow: 1,
     gap: 20,
     paddingHorizontal: 24,
     paddingTop: 26,

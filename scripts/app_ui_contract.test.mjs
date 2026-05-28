@@ -3,12 +3,17 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const homeSource = new URL("../app/index.tsx", import.meta.url);
+const onboardingSource = new URL("../app/onboarding.tsx", import.meta.url);
 const bottomTabBarSource = new URL(
   "../src/components/BottomTabBar.tsx",
   import.meta.url,
 );
 const simulationCanvasSource = new URL(
   "../src/components/SimulationCanvasStage.tsx",
+  import.meta.url,
+);
+const simulationMenuDrawerSource = new URL(
+  "../src/components/SimulationMenuDrawer.tsx",
   import.meta.url,
 );
 const simulationAdjustSource = new URL(
@@ -274,6 +279,25 @@ test("simulation canvas icon actions are accessible and large enough to tap", as
   assert.match(source, /accessibilityLabel="현재 벽 사진 닫기"/);
   assert.match(source, /width: 44/);
   assert.match(source, /height: 44/);
+});
+
+test("simulation menu drawer exposes a temporary profile onboarding shortcut", async () => {
+  const source = await readFile(simulationMenuDrawerSource, "utf8");
+
+  assert.match(source, /임시: 키\/리치 입력/);
+  assert.match(source, /params: \{ mode: "profile" \}/);
+});
+
+test("onboarding profile input remains usable while the numeric keyboard is open", async () => {
+  const source = await readFile(onboardingSource, "utf8");
+  const profileStageBlock =
+    source.match(/function renderProfileStage\(\) \{[\s\S]*?\n  \}/)?.[0] ??
+    "";
+
+  assert.match(source, /KeyboardAvoidingView/);
+  assert.match(source, /Keyboard\.dismiss/);
+  assert.match(profileStageBlock, /keyboardShouldPersistTaps="handled"/);
+  assert.match(profileStageBlock, /contentContainerStyle=\{styles\.profileScreen\}/);
 });
 
 test("quadrant core hint appears only while dragging the core", async () => {
