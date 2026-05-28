@@ -283,7 +283,7 @@ export default function SettingsScreen() {
         <ConfirmModal
           body="입력한 키와 리치를 내 체형 정보로 저장해요."
           confirmLabel="저장"
-          confirmTone="neutral"
+          confirmTone="primary"
           onCancel={() => setConfirmVisible(false)}
           onConfirm={handleConfirmSave}
           onRequestClose={() => setConfirmVisible(false)}

@@ -1214,15 +1214,16 @@ export function SimulationCanvasStage({
         </View>
 
         <ConfirmModal
-          body="현재 시뮬레이션에 올린 사진이 초기화됩니다."
-          confirmLabel="삭제"
+          body="현재 시뮬레이션 진행 내용이 초기화됩니다."
+          confirmLabel="종료"
+          confirmTone="primary"
           onCancel={() => setConfirmVisible(false)}
           onConfirm={() => {
             setConfirmVisible(false);
             onClearPhoto();
           }}
           onRequestClose={() => setConfirmVisible(false)}
-          title="사진을 삭제할까요?"
+          title="시뮬레이션을 종료할까요?"
           visible={confirmVisible}
         />
       </View>

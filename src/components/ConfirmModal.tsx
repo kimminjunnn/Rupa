@@ -6,7 +6,7 @@ type ConfirmModalProps = {
   body: string;
   cancelLabel?: string;
   confirmLabel?: string;
-  confirmTone?: "danger" | "neutral";
+  confirmTone?: "danger" | "neutral" | "primary";
   onCancel: () => void;
   onConfirm: () => void;
   title: string;
@@ -60,7 +60,9 @@ export function ConfirmModal({
                 styles.modalActionButton,
                 confirmTone === "neutral"
                   ? styles.modalNeutralButton
-                  : styles.modalPrimaryButton,
+                  : confirmTone === "primary"
+                    ? styles.modalPrimaryButton
+                    : styles.modalDangerButton,
               ]}
             >
               <Text
@@ -68,7 +70,9 @@ export function ConfirmModal({
                   styles.modalActionText,
                   confirmTone === "neutral"
                     ? styles.modalNeutralButtonText
-                    : styles.modalPrimaryButtonText,
+                    : confirmTone === "primary"
+                      ? styles.modalPrimaryButtonText
+                      : styles.modalDangerButtonText,
                 ]}
               >
                 {confirmLabel}
@@ -140,13 +144,16 @@ const styles = StyleSheet.create({
     borderColor: brand.colors.border,
     backgroundColor: brand.colors.wallLight,
   },
-  modalPrimaryButton: {
+  modalDangerButton: {
     backgroundColor: brand.colors.danger,
   },
   modalNeutralButton: {
     borderWidth: 1,
     borderColor: "rgba(37, 29, 21, 0.14)",
     backgroundColor: brand.colors.surfaceWarm,
+  },
+  modalPrimaryButton: {
+    backgroundColor: brand.colors.primary,
   },
   modalActionText: {
     fontSize: 15,
@@ -155,10 +162,13 @@ const styles = StyleSheet.create({
   modalSecondaryButtonText: {
     color: brand.colors.text,
   },
-  modalPrimaryButtonText: {
+  modalDangerButtonText: {
     color: brand.colors.primaryText,
   },
   modalNeutralButtonText: {
     color: brand.colors.text,
+  },
+  modalPrimaryButtonText: {
+    color: brand.colors.primaryText,
   },
 });
