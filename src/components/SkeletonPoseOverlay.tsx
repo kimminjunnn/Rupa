@@ -62,6 +62,7 @@ import type {
   CharacterRigPart,
   CharacterRigTransformOptions,
 } from "../types/characterRig";
+import type { BodyProfile } from "../types/bodyProfile";
 import type { Point2D } from "../types/geometry";
 import type {
   SkeletonBodyModel,
@@ -86,6 +87,7 @@ export type SkeletonCharacterRenderStyle =
 type SkeletonPoseOverlayProps = {
   allowEmptySpacePinchScale?: boolean;
   allowPinchScaleInSimulation?: boolean;
+  bodyProfile?: BodyProfile;
   characterParts?: ReadonlyArray<CharacterRigPart>;
   characterRenderStyle?: SkeletonCharacterRenderStyle;
   getCharacterTransformOptions?: (
@@ -94,6 +96,7 @@ type SkeletonPoseOverlayProps = {
   ) => CharacterRigTransformOptions;
   initialCenter?: Point2D;
   initialPoseVariant?: "default" | "standing";
+  interactive?: boolean;
   mode: "calibrating" | "simulating";
   onHistoryStateChange?: (state: SkeletonPoseOverlayHistoryState) => void;
   onTutorialHandleStart?: (target: SkeletonDragTarget) => void;
@@ -337,11 +340,13 @@ export const SkeletonPoseOverlay = forwardRef<
   {
     allowEmptySpacePinchScale = false,
     allowPinchScaleInSimulation = false,
+    bodyProfile,
     characterParts = RUPA_BACK_CHARACTER_PARTS,
     characterRenderStyle = "stickmanCharacter",
     getCharacterTransformOptions = getRupaCharacterTransformOptions,
     initialCenter,
     initialPoseVariant = "default",
+    interactive = true,
     mode,
     onHistoryStateChange,
     onTutorialHandleStart,
@@ -363,7 +368,8 @@ export const SkeletonPoseOverlay = forwardRef<
   },
   ref,
 ) {
-  const { profile } = useBodyProfileStore();
+  const { profile: storedProfile } = useBodyProfileStore();
+  const profile = bodyProfile ?? storedProfile;
   const initialCenterX = initialCenter?.x;
   const initialCenterY = initialCenter?.y;
   const [scale, setScale] = useState(DEFAULT_SKELETON_SCALE);
@@ -1247,10 +1253,11 @@ export const SkeletonPoseOverlay = forwardRef<
 
   const isDirectJointTutorial = tutorialDirectJointGroup !== null;
   const shouldShowBodyHitArea =
-    !tutorialDisableDirectHandles && !isDirectJointTutorial;
+    interactive && !tutorialDisableDirectHandles && !isDirectJointTutorial;
   const shouldShowEndpointHitAreas =
-    !tutorialDisableDirectHandles && !isDirectJointTutorial;
+    interactive && !tutorialDisableDirectHandles && !isDirectJointTutorial;
   const shouldShowHeadHitArea =
+    interactive &&
     !tutorialDisableDirectHandles &&
     (!isDirectJointTutorial || tutorialDirectJointGroup === "neck");
 
@@ -1274,7 +1281,11 @@ export const SkeletonPoseOverlay = forwardRef<
   return (
     <View
       {...pinchResponder.panHandlers}
-      pointerEvents={getSkeletonOverlayPointerEvents(allowEmptySpacePinchScale)}
+      pointerEvents={
+        interactive
+          ? getSkeletonOverlayPointerEvents(allowEmptySpacePinchScale)
+          : "none"
+      }
       style={styles.overlay}
     >
       {shouldRenderRasterCharacter ? (
@@ -1594,7 +1605,8 @@ export const SkeletonPoseOverlay = forwardRef<
         );
       })}
 
-      {mode === "simulating" &&
+      {interactive &&
+      mode === "simulating" &&
       simulationInputMode === "quadrants" &&
       !tutorialDisableQuadrants ? (
         <View

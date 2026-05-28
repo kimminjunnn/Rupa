@@ -15,31 +15,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BottomTabBar } from "../../src/components/BottomTabBar";
 import { ConfirmModal } from "../../src/components/ConfirmModal";
 import { SimulationBackground } from "../../src/components/SimulationBackground";
+import {
+  parsePositiveNumber,
+  toDisplayNumber,
+  toNumericInput,
+  validateBodyProfileDraft,
+} from "../../src/lib/bodyProfileForm";
 import { useBodyProfileStore } from "../../src/store/useBodyProfileStore";
 import { brand } from "../../src/theme/brand";
 import { deriveWingspan, type WingspanMode } from "../../src/types/bodyProfile";
-
-function toDisplayNumber(value: number) {
-  return String(value);
-}
-
-function toNumericInput(text: string) {
-  return text.replace(/\D+/g, "");
-}
-
-function parsePositiveNumber(value: string) {
-  if (value.trim().length === 0) {
-    return null;
-  }
-
-  const parsed = Number(value);
-
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -66,22 +50,15 @@ export default function SettingsScreen() {
   }, [hasBodyProfile, profile.height, profile.wingspan, profile.wingspanMode]);
 
   function validateDraft() {
-    const nextHeight = parsePositiveNumber(draftHeight);
-    const nextWingspan = parsePositiveNumber(draftWingspan);
-    const nextHeightError =
-      nextHeight === null ? "키는 0보다 큰 숫자로 입력해 주세요." : null;
-    const nextWingspanError =
-      nextWingspan === null ? "리치는 0보다 큰 숫자로 입력해 주세요." : null;
+    const validation = validateBodyProfileDraft({
+      height: draftHeight,
+      wingspan: draftWingspan,
+    });
 
-    setHeightError(nextHeightError);
-    setWingspanError(nextWingspanError);
+    setHeightError(validation.heightError);
+    setWingspanError(validation.wingspanError);
 
-    return {
-      height: nextHeight,
-      heightError: nextHeightError,
-      wingspan: nextWingspan,
-      wingspanError: nextWingspanError,
-    };
+    return validation;
   }
 
   function handleHeightChange(text: string) {

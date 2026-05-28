@@ -45,6 +45,10 @@ const routeDetectionApiSource = new URL(
   "../src/lib/routeDetectionApi.ts",
   import.meta.url,
 );
+const bodyProfileFormSource = new URL(
+  "../src/lib/bodyProfileForm.ts",
+  import.meta.url,
+);
 const homeGlassCardSource = new URL(
   "../src/components/HomeGlassCard.tsx",
   import.meta.url,
@@ -243,8 +247,10 @@ test("settings screen keeps the profile form visually organized", async () => {
   assert.match(source, /hasBodyProfile/);
   assert.match(source, /hasBodyProfile \? toDisplayNumber\(profile\.height\) : "0"/);
   assert.match(source, /hasBodyProfile \? toDisplayNumber\(profile\.wingspan\) : "0"/);
-  assert.match(source, /function toNumericInput/);
-  assert.match(source, /text\.replace\(\/\\D\+\/g, ""\)/);
+  assert.match(source, /from "\.\.\/\.\.\/src\/lib\/bodyProfileForm"/);
+  assert.doesNotMatch(source, /function toNumericInput/);
+  assert.doesNotMatch(source, /function parsePositiveNumber/);
+  assert.doesNotMatch(source, /function toDisplayNumber/);
   assert.match(source, /const nextText = toNumericInput\(text\)/);
   assert.doesNotMatch(source, /placeholder=/);
   assert.doesNotMatch(source, /placeholderTextColor/);
@@ -281,11 +287,11 @@ test("simulation canvas icon actions are accessible and large enough to tap", as
   assert.match(source, /height: 44/);
 });
 
-test("simulation menu drawer exposes a temporary profile onboarding shortcut", async () => {
+test("simulation menu drawer does not expose the temporary profile onboarding shortcut", async () => {
   const source = await readFile(simulationMenuDrawerSource, "utf8");
 
-  assert.match(source, /임시: 키\/리치 입력/);
-  assert.match(source, /params: \{ mode: "profile" \}/);
+  assert.doesNotMatch(source, /임시: 키\/리치 입력/);
+  assert.doesNotMatch(source, /params: \{ mode: "profile" \}/);
 });
 
 test("onboarding profile input remains usable while the numeric keyboard is open", async () => {
@@ -298,6 +304,99 @@ test("onboarding profile input remains usable while the numeric keyboard is open
   assert.match(source, /Keyboard\.dismiss/);
   assert.match(profileStageBlock, /keyboardShouldPersistTaps="handled"/);
   assert.match(profileStageBlock, /contentContainerStyle=\{styles\.profileScreen\}/);
+});
+
+test("onboarding profile confirm button stays outside the keyboard avoiding area", async () => {
+  const source = await readFile(onboardingSource, "utf8");
+  const keyboardAvoidingBlock =
+    source.match(/<KeyboardAvoidingView[\s\S]*?<\/KeyboardAvoidingView>/)?.[0] ??
+    "";
+
+  assert.doesNotMatch(keyboardAvoidingBlock, /onPress=\{handleSaveProfile\}/);
+  assert.doesNotMatch(keyboardAvoidingBlock, /styles\.primaryButton/);
+  assert.match(source, /styles\.profileActionBar/);
+});
+
+test("onboarding profile shows a read-only draft character preview", async () => {
+  const source = await readFile(onboardingSource, "utf8");
+  const profileStageBlock =
+    source.match(/function renderProfileStage\(\) \{[\s\S]*?\n  \}/)?.[0] ??
+    "";
+
+  assert.match(source, /const draftPreviewProfile = useMemo/);
+  assert.match(source, /const PROFILE_PREVIEW_HEIGHT = 220/);
+  assert.match(profileStageBlock, /styles\.profilePreviewPanel/);
+  assert.match(profileStageBlock, /styles\.profilePreviewViewport/);
+  assert.match(profileStageBlock, /bodyProfile=\{draftPreviewProfile\}/);
+  assert.match(profileStageBlock, /characterRenderStyle="stickmanCharacterBlack"/);
+  assert.match(profileStageBlock, /interactive=\{false\}/);
+  assert.match(profileStageBlock, /initialPoseVariant="standing"/);
+});
+
+test("onboarding profile header uses the Rupa logo and current body setup copy", async () => {
+  const source = await readFile(onboardingSource, "utf8");
+  const profileHeaderBlock =
+    source.match(/<View style=\{styles\.profileHeader\}>[\s\S]*?<\/View>/)?.[0] ??
+    "";
+
+  assert.match(profileHeaderBlock, /require\("\.\.\/assets\/rupa-logo\.png"\)/);
+  assert.match(profileHeaderBlock, /styles\.profileLogo/);
+  assert.doesNotMatch(profileHeaderBlock, /Rupa Onboarding/);
+  assert.match(profileHeaderBlock, /키와 리치를 설정해주세요/);
+  assert.doesNotMatch(profileHeaderBlock, /내 몸 기준부터 맞춰요/);
+  assert.match(
+    profileHeaderBlock,
+    /입력한 키와 리치는 시뮬레이션 캐릭터에 반영됩니다\./,
+  );
+  assert.doesNotMatch(
+    profileHeaderBlock,
+    /입력한 키와 리치가 캐릭터 크기와 무브 거리의 기준이 됩니다\./,
+  );
+});
+
+test("onboarding and settings share body profile input logic", async () => {
+  const onboarding = await readFile(onboardingSource, "utf8");
+  const settings = await readFile(settingsSource, "utf8");
+  const form = await readFile(bodyProfileFormSource, "utf8");
+
+  assert.match(onboarding, /from "\.\.\/src\/lib\/bodyProfileForm"/);
+  assert.match(settings, /from "\.\.\/\.\.\/src\/lib\/bodyProfileForm"/);
+  assert.doesNotMatch(onboarding, /function toNumericInput/);
+  assert.doesNotMatch(onboarding, /function parsePositiveNumber/);
+  assert.doesNotMatch(settings, /function toNumericInput/);
+  assert.doesNotMatch(settings, /function parsePositiveNumber/);
+  assert.match(form, /export function toNumericInput/);
+  assert.match(form, /export function parsePositiveNumber/);
+  assert.match(form, /export function toDisplayNumber/);
+  assert.match(form, /export function validateBodyProfileDraft/);
+  assert.match(form, /nextHeight === null/);
+  assert.match(form, /nextWingspan === null/);
+});
+
+test("onboarding profile input mirrors settings auto and custom reach behavior", async () => {
+  const source = await readFile(onboardingSource, "utf8");
+
+  assert.match(source, /draftWingspanMode === "auto"/);
+  assert.match(source, /draftWingspanMode === "auto" \? "자동" : "커스텀"/);
+  assert.match(source, /setDraftWingspanMode\("custom"\)/);
+  assert.match(source, /setDraftWingspanMode\("auto"\)/);
+  assert.match(source, /setDraftWingspan\(toDisplayNumber\(deriveWingspan\(nextHeight\)\)\)/);
+  assert.match(source, /자동 계산 복원/);
+  assert.match(source, /validateBodyProfileDraft\(\{\s*height: draftHeight,\s*wingspan: draftWingspan/s);
+});
+
+test("onboarding tutorial chrome uses the Rupa logo instead of title copy", async () => {
+  const source = await readFile(onboardingSource, "utf8");
+  const tutorialChromeBlock =
+    source.match(/<View style=\{styles\.tutorialChrome\}>[\s\S]*?<View onLayout=\{handleViewportLayout\}/)?.[0] ??
+    "";
+
+  assert.match(tutorialChromeBlock, /require\("\.\.\/assets\/rupa-logo\.png"\)/);
+  assert.match(tutorialChromeBlock, /styles\.tutorialLogo/);
+  assert.doesNotMatch(tutorialChromeBlock, />Tutorial</);
+  assert.doesNotMatch(tutorialChromeBlock, />루파 조작 연습</);
+  assert.doesNotMatch(source, /tutorialTitleWrap/);
+  assert.doesNotMatch(source, /tutorialChromeTitle/);
 });
 
 test("quadrant core hint appears only while dragging the core", async () => {

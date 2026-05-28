@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Image,
   LayoutChangeEvent,
   Modal,
   Platform,
@@ -30,10 +31,20 @@ import {
   isTutorialStepTargetReached,
   type OnboardingTutorialStepId,
 } from "../src/lib/onboardingTutorialFlow";
+import {
+  parsePositiveNumber,
+  toDisplayNumber,
+  toNumericInput,
+  validateBodyProfileDraft,
+} from "../src/lib/bodyProfileForm";
 import { useBodyProfileStore } from "../src/store/useBodyProfileStore";
 import { useOnboardingStore } from "../src/store/useOnboardingStore";
 import { brand } from "../src/theme/brand";
-import { deriveWingspan, type WingspanMode } from "../src/types/bodyProfile";
+import {
+  deriveWingspan,
+  type BodyProfile,
+  type WingspanMode,
+} from "../src/types/bodyProfile";
 import type {
   SkeletonEndpointName,
   SkeletonPose,
@@ -41,25 +52,9 @@ import type {
 
 const TARGET_RADIUS = 24;
 const HOLD_RADIUS = 12;
+const PROFILE_PREVIEW_WIDTH = 260;
+const PROFILE_PREVIEW_HEIGHT = 220;
 type DirectJointTutorialGroup = "neck" | "elbows" | "knees";
-
-function toNumericInput(text: string) {
-  return text.replace(/\D+/g, "");
-}
-
-function parsePositiveNumber(value: string) {
-  if (value.trim().length === 0) {
-    return null;
-  }
-
-  const parsed = Number(value);
-
-  return Number.isNaN(parsed) || parsed <= 0 ? null : parsed;
-}
-
-function toDisplayNumber(value: number) {
-  return String(value);
-}
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -102,6 +97,17 @@ export default function OnboardingScreen() {
     });
 
   const currentStep = getOnboardingTutorialStep(stepId);
+  const draftPreviewProfile = useMemo<BodyProfile>(() => {
+    const height = parsePositiveNumber(draftHeight) ?? profile.height;
+    const wingspan =
+      parsePositiveNumber(draftWingspan) ?? deriveWingspan(height);
+
+    return {
+      height,
+      wingspan,
+      wingspanMode: draftWingspanMode,
+    };
+  }, [draftHeight, draftWingspan, draftWingspanMode, profile.height]);
   const targetLayout = useMemo(
     () =>
       viewport.width > 0 && viewport.height > 0
@@ -195,13 +201,16 @@ export default function OnboardingScreen() {
 
     const nextHeight = parsePositiveNumber(nextText);
 
-    if (nextHeight) {
-      setDraftWingspan(toDisplayNumber(deriveWingspan(nextHeight)));
+    if (nextHeight === null) {
+      return;
     }
+
+    setDraftWingspan(toDisplayNumber(deriveWingspan(nextHeight)));
   }
 
   function handleWingspanChange(text: string) {
-    setDraftWingspan(toNumericInput(text));
+    const nextText = toNumericInput(text);
+    setDraftWingspan(nextText);
     setDraftWingspanMode("custom");
     setWingspanError(null);
   }
@@ -214,21 +223,31 @@ export default function OnboardingScreen() {
   }
 
   function handleSaveProfile() {
-    const nextHeight = parsePositiveNumber(draftHeight);
-    const nextWingspan = parsePositiveNumber(draftWingspan);
+    const {
+      height,
+      heightError: nextHeightError,
+      wingspan,
+      wingspanError: nextWingspanError,
+    } = validateBodyProfileDraft({
+      height: draftHeight,
+      wingspan: draftWingspan,
+    });
 
-    setHeightError(nextHeight ? null : "키는 0보다 큰 숫자로 입력해 주세요.");
-    setWingspanError(
-      nextWingspan ? null : "리치는 0보다 큰 숫자로 입력해 주세요.",
-    );
+    setHeightError(nextHeightError);
+    setWingspanError(nextWingspanError);
 
-    if (!nextHeight || !nextWingspan) {
+    if (
+      nextHeightError ||
+      nextWingspanError ||
+      height === null ||
+      wingspan === null
+    ) {
       return;
     }
 
     updateProfile({
-      height: nextHeight,
-      wingspan: nextWingspan,
+      height,
+      wingspan,
       wingspanMode: draftWingspanMode,
     });
     setStage("tutorial");
@@ -248,6 +267,7 @@ export default function OnboardingScreen() {
 
   function handleStartFreePractice() {
     completeOnboarding();
+    setFreePracticeInputMode("quadrants");
     setIsFreePractice(true);
   }
 
@@ -353,101 +373,151 @@ export default function OnboardingScreen() {
   function renderProfileStage() {
     return (
       <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.profileKeyboardAvoider}
-        >
-          <TouchableWithoutFeedback
-            accessible={false}
-            onPress={Keyboard.dismiss}
+        <View style={styles.profileShell}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.profileKeyboardAvoider}
           >
-            <ScrollView
-              contentContainerStyle={styles.profileScreen}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              style={styles.profileScrollView}
+            <TouchableWithoutFeedback
+              accessible={false}
+              onPress={Keyboard.dismiss}
             >
-              <View style={styles.profileHeader}>
-                <Text style={styles.eyebrow}>Rupa Onboarding</Text>
-                <Text style={styles.profileTitle}>내 몸 기준부터 맞춰요</Text>
-                <Text style={styles.profileBody}>
-                  입력한 키와 리치가 캐릭터 크기와 무브 거리의 기준이 됩니다.
-                </Text>
-              </View>
-
-              <View style={styles.formPanel}>
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>키</Text>
-                  <View
-                    style={[
-                      styles.inputShell,
-                      heightError ? styles.inputShellInvalid : null,
-                    ]}
-                  >
-                    <TextInput
-                      keyboardType="numeric"
-                      onChangeText={handleHeightChange}
-                      returnKeyType="done"
-                      style={styles.input}
-                      value={draftHeight}
-                    />
-                    <Text style={styles.unit}>cm</Text>
-                  </View>
-                  {heightError ? (
-                    <Text style={styles.errorText}>{heightError}</Text>
-                  ) : null}
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <View style={styles.fieldHeaderRow}>
-                    <Text style={styles.label}>리치</Text>
-                    <Pressable
-                      onPress={handleRestoreAutoWingspan}
-                      style={styles.inlineAction}
-                    >
-                      <Ionicons
-                        color={brand.colors.primaryText}
-                        name="refresh"
-                        size={14}
-                      />
-                      <Text style={styles.inlineActionText}>자동 계산</Text>
-                    </Pressable>
-                  </View>
-                  <View
-                    style={[
-                      styles.inputShell,
-                      wingspanError ? styles.inputShellInvalid : null,
-                    ]}
-                  >
-                    <TextInput
-                      keyboardType="numeric"
-                      onChangeText={handleWingspanChange}
-                      returnKeyType="done"
-                      style={styles.input}
-                      value={draftWingspan}
-                    />
-                    <Text style={styles.unit}>cm</Text>
-                  </View>
-                  {wingspanError ? (
-                    <Text style={styles.errorText}>{wingspanError}</Text>
-                  ) : null}
-                </View>
-              </View>
-
-              <Pressable
-                onPress={handleSaveProfile}
-                style={styles.primaryButton}
+              <ScrollView
+                contentContainerStyle={styles.profileScreen}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                style={styles.profileScrollView}
               >
-                <Text style={styles.primaryButtonText}>조작 연습하기</Text>
-                <Ionicons
-                  color={brand.colors.primaryText}
-                  name="arrow-forward"
-                  size={24}
-                />
-              </Pressable>
-            </ScrollView>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+                <View style={styles.profileHeader}>
+                  <Image
+                    accessibilityLabel="Rupa"
+                    resizeMode="contain"
+                    source={require("../assets/rupa-logo.png")}
+                    style={styles.profileLogo}
+                  />
+                  <Text style={styles.profileTitle}>
+                    키와 리치를 설정해주세요
+                  </Text>
+                  <Text style={styles.profileBody}>
+                    입력한 키와 리치는 시뮬레이션 캐릭터에 반영됩니다.
+                  </Text>
+                </View>
+
+                <View style={styles.formPanel}>
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>키</Text>
+                    <View
+                      style={[
+                        styles.inputShell,
+                        heightError ? styles.inputShellInvalid : null,
+                      ]}
+                    >
+                      <TextInput
+                        keyboardType="numeric"
+                        onChangeText={handleHeightChange}
+                        returnKeyType="done"
+                        style={styles.input}
+                        value={draftHeight}
+                      />
+                      <Text style={styles.unit}>cm</Text>
+                    </View>
+                    {heightError ? (
+                      <Text style={styles.errorText}>{heightError}</Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.fieldGroup}>
+                    <View style={styles.fieldHeaderRow}>
+                      <Text style={styles.label}>리치</Text>
+                      <View
+                        style={[
+                          styles.modeBadge,
+                          draftWingspanMode === "auto"
+                            ? styles.modeBadgeAuto
+                            : styles.modeBadgeCustom,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.modeBadgeText,
+                            draftWingspanMode === "auto"
+                              ? styles.modeBadgeTextAuto
+                              : styles.modeBadgeTextCustom,
+                          ]}
+                        >
+                          {draftWingspanMode === "auto" ? "자동" : "커스텀"}
+                        </Text>
+                      </View>
+                    </View>
+                    <View
+                      style={[
+                        styles.inputShell,
+                        wingspanError ? styles.inputShellInvalid : null,
+                      ]}
+                    >
+                      <TextInput
+                        keyboardType="numeric"
+                        onChangeText={handleWingspanChange}
+                        returnKeyType="done"
+                        style={styles.input}
+                        value={draftWingspan}
+                      />
+                      <Text style={styles.unit}>cm</Text>
+                    </View>
+                    <View style={styles.fieldFooterRow}>
+                      <Text style={styles.helper}> </Text>
+                      <Pressable
+                        onPress={handleRestoreAutoWingspan}
+                        style={styles.inlineAction}
+                      >
+                        <Ionicons
+                          color={brand.colors.primaryText}
+                          name="refresh"
+                          size={14}
+                        />
+                        <Text style={styles.inlineActionText}>
+                          자동 계산 복원
+                        </Text>
+                      </Pressable>
+                    </View>
+                    {wingspanError ? (
+                      <Text style={styles.errorText}>{wingspanError}</Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View style={styles.profilePreviewPanel}>
+                  <View style={styles.profilePreviewViewport}>
+                    <SkeletonPoseOverlay
+                      bodyProfile={draftPreviewProfile}
+                      characterRenderStyle="stickmanCharacterBlack"
+                      initialCenter={{
+                        x: PROFILE_PREVIEW_WIDTH * 0.5,
+                        y: PROFILE_PREVIEW_HEIGHT * 0.48,
+                      }}
+                      initialPoseVariant="standing"
+                      interactive={false}
+                      mode="simulating"
+                      viewportHeight={PROFILE_PREVIEW_HEIGHT}
+                      viewportWidth={PROFILE_PREVIEW_WIDTH}
+                    />
+                  </View>
+                </View>
+              </ScrollView>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+
+          <View style={styles.profileActionBar}>
+            <Pressable onPress={handleSaveProfile} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>확인</Text>
+              <Ionicons
+                color={brand.colors.primaryText}
+                name="arrow-forward"
+                size={24}
+              />
+            </Pressable>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -627,10 +697,12 @@ export default function OnboardingScreen() {
       <SafeAreaView edges={["top"]} style={styles.safeArea}>
         <View style={styles.tutorialScreen}>
           <View style={styles.tutorialChrome}>
-            <View style={styles.tutorialTitleWrap}>
-              <Text style={styles.eyebrow}>Tutorial</Text>
-              <Text style={styles.tutorialChromeTitle}>루파 조작 연습</Text>
-            </View>
+            <Image
+              accessibilityLabel="Rupa"
+              resizeMode="contain"
+              source={require("../assets/rupa-logo.png")}
+              style={styles.tutorialLogo}
+            />
 
             <View style={styles.tutorialActions}>
               {renderTutorialChromeControls()}
@@ -789,6 +861,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brand.colors.wall,
   },
+  profileShell: {
+    flex: 1,
+    backgroundColor: brand.colors.wall,
+  },
   profileKeyboardAvoider: {
     flex: 1,
   },
@@ -801,11 +877,15 @@ const styles = StyleSheet.create({
     gap: 20,
     paddingHorizontal: 24,
     paddingTop: 26,
-    paddingBottom: 28,
+    paddingBottom: 18,
     backgroundColor: brand.colors.wall,
   },
   profileHeader: {
     gap: 8,
+  },
+  profileLogo: {
+    width: 116,
+    height: 54,
   },
   eyebrow: {
     color: brand.colors.inactive,
@@ -835,6 +915,20 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: "rgba(255,248,231,0.92)",
   },
+  profilePreviewPanel: {
+    height: PROFILE_PREVIEW_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(37,29,21,0.12)",
+    borderRadius: 22,
+    backgroundColor: "#f7efe1",
+  },
+  profilePreviewViewport: {
+    width: PROFILE_PREVIEW_WIDTH,
+    height: PROFILE_PREVIEW_HEIGHT,
+  },
   fieldGroup: {
     gap: 9,
   },
@@ -848,6 +942,27 @@ const styles = StyleSheet.create({
     color: brand.colors.text,
     fontSize: 15,
     fontWeight: "900",
+  },
+  modeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+  },
+  modeBadgeAuto: {
+    backgroundColor: brand.colors.primary,
+  },
+  modeBadgeCustom: {
+    backgroundColor: brand.colors.surfaceWarm,
+  },
+  modeBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  modeBadgeTextAuto: {
+    color: brand.colors.primaryText,
+  },
+  modeBadgeTextCustom: {
+    color: brand.colors.mutedText,
   },
   inputShell: {
     minHeight: 58,
@@ -874,6 +989,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
   },
+  fieldFooterRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  helper: {
+    flex: 1,
+  },
   inlineAction: {
     minHeight: 32,
     flexDirection: "row",
@@ -896,13 +1020,18 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minHeight: 64,
-    marginTop: "auto",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
     borderRadius: 22,
     backgroundColor: brand.colors.primary,
+  },
+  profileActionBar: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    paddingBottom: 18,
+    backgroundColor: brand.colors.wall,
   },
   primaryButtonText: {
     color: brand.colors.primaryText,
@@ -926,13 +1055,9 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(37,29,21,0.12)",
     backgroundColor: brand.colors.wall,
   },
-  tutorialTitleWrap: {
-    flex: 1,
-  },
-  tutorialChromeTitle: {
-    color: brand.colors.text,
-    fontSize: 20,
-    fontWeight: "900",
+  tutorialLogo: {
+    width: 94,
+    height: 44,
   },
   tutorialActions: {
     flexDirection: "row",
