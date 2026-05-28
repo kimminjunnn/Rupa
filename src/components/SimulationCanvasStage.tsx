@@ -18,6 +18,7 @@ import {
 } from "../lib/routeDetectionApi";
 import { shouldLockRouteDetectionNavigation } from "../lib/routeDetectionUi";
 import { isSimulationClearComplete } from "../lib/simulationClearState";
+import { shouldShowSkeletonSizingHint } from "../lib/skeletonSizingHint";
 import {
   analysisPointToViewportPoint,
   viewportPointToAnalysisPoint,
@@ -93,7 +94,11 @@ export function SimulationCanvasStage({
   const simulationCueOpacity = useRef(new Animated.Value(0)).current;
   const simulationCueTranslateY = useRef(new Animated.Value(18)).current;
   const simulationCueScale = useRef(new Animated.Value(0.92)).current;
+  const sizingHintOpacity = useRef(new Animated.Value(0)).current;
+  const sizingHintSpread = useRef(new Animated.Value(0)).current;
+  const sizingHintScale = useRef(new Animated.Value(0.96)).current;
   const skeletonOverlayRef = useRef<SkeletonPoseOverlayHandle>(null);
+  const [isSizingHintVisible, setIsSizingHintVisible] = useState(false);
   const [skeletonHistoryState, setSkeletonHistoryState] =
     useState<SkeletonPoseOverlayHistoryState>({
       canRedo: false,
@@ -217,6 +222,87 @@ export function SimulationCanvasStage({
     simulationCueScale,
     simulationCueTranslateY,
   ]);
+
+  useEffect(() => {
+    sizingHintOpacity.stopAnimation();
+    sizingHintSpread.stopAnimation();
+    sizingHintScale.stopAnimation();
+
+    if (!shouldShowSkeletonSizingHint(flowStep)) {
+      setIsSizingHintVisible(false);
+      sizingHintOpacity.setValue(0);
+      sizingHintSpread.setValue(0);
+      sizingHintScale.setValue(0.96);
+      return;
+    }
+
+    setIsSizingHintVisible(true);
+    sizingHintOpacity.setValue(0);
+    sizingHintSpread.setValue(0);
+    sizingHintScale.setValue(0.96);
+
+    const hintAnimation = Animated.sequence([
+      Animated.parallel([
+        Animated.timing(sizingHintOpacity, {
+          toValue: 1,
+          duration: 160,
+          useNativeDriver: true,
+        }),
+        Animated.spring(sizingHintScale, {
+          toValue: 1,
+          friction: 7,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(sizingHintSpread, {
+              toValue: 1,
+              duration: 260,
+              useNativeDriver: true,
+            }),
+            Animated.spring(sizingHintScale, {
+              toValue: 1.04,
+              friction: 5,
+              tension: 160,
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(sizingHintSpread, {
+              toValue: 0,
+              duration: 230,
+              useNativeDriver: true,
+            }),
+            Animated.spring(sizingHintScale, {
+              toValue: 0.98,
+              friction: 5,
+              tension: 150,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
+        { iterations: 3 },
+      ),
+      Animated.timing(sizingHintOpacity, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    hintAnimation.start(({ finished }) => {
+      if (finished) {
+        setIsSizingHintVisible(false);
+      }
+    });
+
+    return () => {
+      hintAnimation.stop();
+    };
+  }, [flowStep, sizingHintOpacity, sizingHintScale, sizingHintSpread]);
 
   useEffect(() => {
     if (flowStep === "simulating") {
@@ -679,7 +765,7 @@ export function SimulationCanvasStage({
       case "routeEditing":
         return "인식되지 않은 홀드를 탭하여 루트를 보정하세요.";
       case "sizingSkeleton":
-        return "캐릭터의 크기를 조정하고, 스타트 자세를 취해주세요.";
+        return "두 손가락으로 크기를 맞추고, 스타트 자세를 취해주세요.";
       case "simulating":
         return "캐릭터를 움직여 무브를 시뮬레이션해보세요.";
     }
@@ -846,6 +932,77 @@ export function SimulationCanvasStage({
           ) : null}
         </View>
       </View>
+    );
+  }
+
+  function renderSkeletonSizingHint() {
+    if (!isSizingHintVisible) {
+      return null;
+    }
+
+    const leftFingerTranslateX = sizingHintSpread.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-7, -25],
+    });
+    const rightFingerTranslateX = sizingHintSpread.interpolate({
+      inputRange: [0, 1],
+      outputRange: [7, 25],
+    });
+    const leftFingerRotate = sizingHintSpread.interpolate({
+      inputRange: [0, 1],
+      outputRange: ["-8deg", "-18deg"],
+    });
+    const rightFingerRotate = sizingHintSpread.interpolate({
+      inputRange: [0, 1],
+      outputRange: ["8deg", "18deg"],
+    });
+
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.sizingHint,
+          {
+            opacity: sizingHintOpacity,
+            transform: [{ scale: sizingHintScale }],
+          },
+        ]}
+      >
+        <View style={styles.sizingHintGesture}>
+          <Animated.View
+            style={[
+              styles.sizingHintFinger,
+              styles.sizingHintFingerLeft,
+              {
+                transform: [
+                  { translateX: leftFingerTranslateX },
+                  { rotate: leftFingerRotate },
+                ],
+              },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.sizingHintFinger,
+              styles.sizingHintFingerRight,
+              {
+                transform: [
+                  { translateX: rightFingerTranslateX },
+                  { rotate: rightFingerRotate },
+                ],
+              },
+            ]}
+          />
+        </View>
+        <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          numberOfLines={1}
+          style={styles.sizingHintText}
+        >
+          두 손가락으로 크기 맞추기
+        </Text>
+      </Animated.View>
     );
   }
 
@@ -1026,6 +1183,8 @@ export function SimulationCanvasStage({
             />
           ) : null}
 
+          {renderSkeletonSizingHint()}
+
           {renderInstructionPanel()}
 
           <Animated.View
@@ -1182,6 +1341,60 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     gap: 8,
+  },
+  sizingHint: {
+    position: "absolute",
+    top: "38%",
+    left: 44,
+    right: 44,
+    zIndex: 18,
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(10, 10, 10, 0.58)",
+  },
+  sizingHintGesture: {
+    width: 76,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sizingHintFinger: {
+    position: "absolute",
+    width: 20,
+    height: 34,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.92)",
+    backgroundColor: "rgba(255, 179, 122, 0.9)",
+    shadowColor: "#000000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  sizingHintFingerLeft: {
+    bottom: 2,
+  },
+  sizingHintFingerRight: {
+    top: 2,
+  },
+  sizingHintText: {
+    flexShrink: 1,
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "900",
+    lineHeight: 19,
+    textShadowColor: "rgba(0,0,0,0.45)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
   startWithoutAnalysisButton: {
     alignSelf: "flex-start",
