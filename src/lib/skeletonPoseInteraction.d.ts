@@ -14,6 +14,11 @@ export function shouldHandleQuadrantDrag(input: {
   touchCount: number;
 }): boolean;
 
+export function getVisibleQuadrantHintEndpoints(input: {
+  activeEndpointNames: Array<"leftHand" | "rightHand" | "leftFoot" | "rightFoot">;
+  previewEndpointName: "leftHand" | "rightHand" | "leftFoot" | "rightFoot" | null;
+}): Array<"leftHand" | "rightHand" | "leftFoot" | "rightFoot">;
+
 export function getTutorialDirectJointMarkerStyle(input: {
   jointActiveRadius: number;
 }): {

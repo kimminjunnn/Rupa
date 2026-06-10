@@ -45,6 +45,7 @@ import {
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
   getTutorialDirectJointMarkerStyle,
+  getVisibleQuadrantHintEndpoints,
   isCoreDragStart,
   isQuadrantEndpointAllowed,
   shouldHandleQuadrantDrag,
@@ -423,8 +424,9 @@ export const SkeletonPoseOverlay = forwardRef<
       canUndo: false,
     });
   const [activeControlId, setActiveControlId] = useState<string | null>(null);
-  const [activeQuadrantEndpoint, setActiveQuadrantEndpoint] =
-    useState<SkeletonEndpointName | null>(null);
+  const [activeQuadrantEndpoints, setActiveQuadrantEndpoints] = useState<
+    SkeletonEndpointName[]
+  >([]);
   const [isQuadrantCoreActive, setIsQuadrantCoreActive] = useState(false);
   const shouldShowCharacter =
     mode === "simulating" && characterRenderStyle !== "none";
@@ -432,8 +434,10 @@ export const SkeletonPoseOverlay = forwardRef<
     isRasterCharacterRenderStyle(characterRenderStyle);
   const shouldRenderVectorCharacter =
     isVectorCharacterRenderStyle(characterRenderStyle);
-  const visibleQuadrantHintEndpoint =
-    activeQuadrantEndpoint ?? tutorialPreviewQuadrantEndpoint;
+  const visibleQuadrantHintEndpoints = getVisibleQuadrantHintEndpoints({
+    activeEndpointNames: activeQuadrantEndpoints,
+    previewEndpointName: tutorialPreviewQuadrantEndpoint,
+  });
   const characterOpacity = getSkeletonCharacterOverlayOpacity({
     activeControlId,
     characterRenderStyle,
@@ -589,7 +593,7 @@ export const SkeletonPoseOverlay = forwardRef<
     poseRef.current = snapshot.pose;
     setScale(snapshot.scale);
     setPose(snapshot.pose);
-    setActiveQuadrantEndpoint(null);
+    setActiveQuadrantEndpoints([]);
     setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
   }
@@ -671,7 +675,7 @@ export const SkeletonPoseOverlay = forwardRef<
       return;
     }
 
-    setActiveQuadrantEndpoint(null);
+    setActiveQuadrantEndpoints([]);
     setIsQuadrantCoreActive(false);
     activeDragModeRef.current = null;
     dragStartPointRef.current = getEndpointPosition(
@@ -736,6 +740,23 @@ export const SkeletonPoseOverlay = forwardRef<
     return target.kind === "body" ? "body" : target.id;
   }
 
+  function getQuadrantEndpointNames(drags: QuadrantTouchDrag[]) {
+    return drags
+      .filter(
+        (drag): drag is QuadrantTouchDrag & {
+          target: { kind: "endpoint"; id: SkeletonEndpointName };
+        } => drag.target.kind === "endpoint",
+      )
+      .map((drag) => drag.target.id);
+  }
+
+  function updateActiveQuadrantIndicators(drags: QuadrantTouchDrag[]) {
+    setIsQuadrantCoreActive(
+      drags.some((drag) => drag.target.kind === "body"),
+    );
+    setActiveQuadrantEndpoints(getQuadrantEndpointNames(drags));
+  }
+
   function syncQuadrantTouchDrags(event: GestureResponderEvent) {
     const activeIdentifiers = new Set(
       event.nativeEvent.touches.map(getTouchIdentifier),
@@ -793,24 +814,15 @@ export const SkeletonPoseOverlay = forwardRef<
 
     const drags = syncQuadrantTouchDrags(event);
     const firstTarget = drags[0]?.target ?? null;
-    const endpointDrags = drags.filter(
-      (drag) => drag.target.kind === "endpoint",
-    );
 
-    setIsQuadrantCoreActive(
-      drags.some((drag) => drag.target.kind === "body"),
-    );
-    setActiveQuadrantEndpoint(
-      endpointDrags.length === 1 && endpointDrags[0].target.kind === "endpoint"
-        ? endpointDrags[0].target.id
-        : null,
-    );
+    updateActiveQuadrantIndicators(drags);
     setActiveDragTarget(firstTarget);
   }
 
   function moveQuadrantTouchDrags(event: GestureResponderEvent) {
     const startPose = dragStartPoseRef.current;
     const drags = syncQuadrantTouchDrags(event);
+    updateActiveQuadrantIndicators(drags);
 
     if (!startPose || drags.length === 0) {
       return;
@@ -897,7 +909,7 @@ export const SkeletonPoseOverlay = forwardRef<
     dragStartPointRef.current = null;
     dragStartPoseRef.current = null;
     dragStartSnapshotRef.current = null;
-    setActiveQuadrantEndpoint(null);
+    setActiveQuadrantEndpoints([]);
     setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
     onTutorialDragEndRef.current?.(endedTarget);
@@ -940,7 +952,7 @@ export const SkeletonPoseOverlay = forwardRef<
       return;
     }
 
-    setActiveQuadrantEndpoint(null);
+    setActiveQuadrantEndpoints([]);
     activeDragModeRef.current = null;
     dragStartPointRef.current = null;
     dragStartPoseRef.current = poseRef.current;
@@ -1204,7 +1216,7 @@ export const SkeletonPoseOverlay = forwardRef<
     dragStartPointRef.current = null;
     dragStartPoseRef.current = null;
     dragStartSnapshotRef.current = null;
-    setActiveQuadrantEndpoint(null);
+    setActiveQuadrantEndpoints([]);
     setIsQuadrantCoreActive(false);
     setActiveDragTarget(null);
     onTutorialDragEndRef.current?.(endedTarget);
@@ -1870,24 +1882,25 @@ export const SkeletonPoseOverlay = forwardRef<
             </View>
           ) : null}
 
-          {visibleQuadrantHintEndpoint ? (
+          {visibleQuadrantHintEndpoints.map((endpointName) => (
             <View
+              key={endpointName}
               pointerEvents="none"
               style={[
                 styles.quadrantHintCell,
-                getQuadrantHintPosition(visibleQuadrantHintEndpoint),
+                getQuadrantHintPosition(endpointName),
               ]}
             >
               <View style={styles.quadrantControlBadge}>
                 <Image
                   accessibilityIgnoresInvertColors
                   resizeMode="contain"
-                  source={getQuadrantEndpointIcon(visibleQuadrantHintEndpoint)}
+                  source={getQuadrantEndpointIcon(endpointName)}
                   style={styles.quadrantControlIcon}
                 />
               </View>
             </View>
-          ) : null}
+          ))}
         </View>
       ) : null}
     </View>

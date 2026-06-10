@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  getVisibleQuadrantHintEndpoints,
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
   getTutorialDirectJointMarkerStyle,
@@ -54,6 +55,30 @@ test("lets quadrant controls handle multi-touch limb dragging", () => {
       touchCount: 2,
     }),
     false,
+  );
+});
+
+test("deduplicates active and preview quadrant hint endpoints", () => {
+  assert.deepEqual(
+    getVisibleQuadrantHintEndpoints({
+      activeEndpointNames: ["leftHand", "rightHand", "leftHand"],
+      previewEndpointName: "rightFoot",
+    }),
+    ["leftHand", "rightHand", "rightFoot"],
+  );
+  assert.deepEqual(
+    getVisibleQuadrantHintEndpoints({
+      activeEndpointNames: ["leftHand", "rightHand"],
+      previewEndpointName: "leftHand",
+    }),
+    ["leftHand", "rightHand"],
+  );
+  assert.deepEqual(
+    getVisibleQuadrantHintEndpoints({
+      activeEndpointNames: [],
+      previewEndpointName: null,
+    }),
+    [],
   );
 });
 

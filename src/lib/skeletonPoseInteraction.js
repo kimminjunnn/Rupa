@@ -26,6 +26,28 @@ export function shouldHandleQuadrantDrag({
   );
 }
 
+export function getVisibleQuadrantHintEndpoints({
+  activeEndpointNames,
+  previewEndpointName,
+}) {
+  const endpointNames = [];
+
+  activeEndpointNames.forEach((endpointName) => {
+    if (!endpointNames.includes(endpointName)) {
+      endpointNames.push(endpointName);
+    }
+  });
+
+  if (
+    previewEndpointName !== null &&
+    !endpointNames.includes(previewEndpointName)
+  ) {
+    endpointNames.push(previewEndpointName);
+  }
+
+  return endpointNames;
+}
+
 export function getTutorialDirectJointMarkerStyle({ jointActiveRadius }) {
   return {
     fill: "transparent",
