@@ -45,27 +45,29 @@ export function SimulationInputStage({
           showsVerticalScrollIndicator={false}
           style={styles.scrollView}
         >
-          <View style={styles.topActionRow}>
-            <Image
-              accessibilityLabel="Rupa"
-              resizeMode="contain"
-              source={require("../../assets/rupa-logo.png")}
-              style={styles.headerLogo}
-            />
+          <View style={styles.introBlock}>
+            <View style={styles.topActionRow}>
+              <Image
+                accessibilityLabel="Rupa"
+                resizeMode="contain"
+                source={require("../../assets/rupa-logo.png")}
+                style={styles.headerLogo}
+              />
 
-            <Pressable
-              accessibilityLabel="시뮬레이션 메뉴 열기"
-              onPress={onOpenMenu}
-              style={styles.menuButton}
-            >
-              <Ionicons color={brand.colors.text} name="menu" size={24} />
-            </Pressable>
-          </View>
+              <Pressable
+                accessibilityLabel="시뮬레이션 메뉴 열기"
+                onPress={onOpenMenu}
+                style={styles.menuButton}
+              >
+                <Ionicons color={brand.colors.text} name="menu" size={24} />
+              </Pressable>
+            </View>
 
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroBody}>
-              사진 위에서 당신의 무브를 시도해보세요
-            </Text>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroBody}>
+                사진 위에서 당신의 무브를 시도해보세요
+              </Text>
+            </View>
           </View>
 
           <Pressable onPress={onOpenCamera} style={styles.primaryCard}>
@@ -163,6 +165,9 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 140,
     gap: 16,
+  },
+  introBlock: {
+    gap: 0,
   },
   heroCopy: {
     gap: 7,
