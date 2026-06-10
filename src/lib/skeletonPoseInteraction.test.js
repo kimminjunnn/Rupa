@@ -2,12 +2,14 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  getTwoHandDynoCoreDelta,
   getVisibleQuadrantHintEndpoints,
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
   getTutorialDirectJointMarkerStyle,
   isQuadrantEndpointAllowed,
   isCoreDragStart,
+  isSkeletonPointActive,
   shouldHandleQuadrantDrag,
   shouldAllowSkeletonPinchScale,
 } = require("./skeletonPoseInteraction.js");
@@ -79,6 +81,83 @@ test("deduplicates active and preview quadrant hint endpoints", () => {
       previewEndpointName: null,
     }),
     [],
+  );
+});
+
+test("marks every touched quadrant endpoint as an active skeleton point", () => {
+  assert.equal(
+    isSkeletonPointActive({
+      activeControlId: "leftHand",
+      activeQuadrantEndpointNames: ["rightHand", "rightFoot"],
+      pointName: "leftHand",
+    }),
+    true,
+  );
+  assert.equal(
+    isSkeletonPointActive({
+      activeControlId: "leftHand",
+      activeQuadrantEndpointNames: ["rightHand", "rightFoot"],
+      pointName: "rightHand",
+    }),
+    true,
+  );
+  assert.equal(
+    isSkeletonPointActive({
+      activeControlId: "leftHand",
+      activeQuadrantEndpointNames: ["rightHand", "rightFoot"],
+      pointName: "rightFoot",
+    }),
+    true,
+  );
+  assert.equal(
+    isSkeletonPointActive({
+      activeControlId: "leftHand",
+      activeQuadrantEndpointNames: ["rightHand", "rightFoot"],
+      pointName: "leftFoot",
+    }),
+    false,
+  );
+});
+
+test("does not move the core while both hand targets stay within arm reach", () => {
+  assert.equal(
+    getTwoHandDynoCoreDelta({
+      armMaxReach: 50,
+      leftRoot: { x: 0, y: 0 },
+      leftStart: { x: 0, y: -20 },
+      leftTarget: { x: 0, y: -45 },
+      rightRoot: { x: 20, y: 0 },
+      rightStart: { x: 20, y: -20 },
+      rightTarget: { x: 20, y: -45 },
+    }),
+    null,
+  );
+});
+
+test("turns upward two-hand reach overflow into core lift", () => {
+  assert.deepEqual(
+    getTwoHandDynoCoreDelta({
+      armMaxReach: 50,
+      leftRoot: { x: 0, y: 0 },
+      leftStart: { x: 0, y: -20 },
+      leftTarget: { x: 0, y: -70 },
+      rightRoot: { x: 20, y: 0 },
+      rightStart: { x: 20, y: -20 },
+      rightTarget: { x: 20, y: -60 },
+    }),
+    { x: 0, y: -15 },
+  );
+  assert.equal(
+    getTwoHandDynoCoreDelta({
+      armMaxReach: 50,
+      leftRoot: { x: 0, y: 0 },
+      leftStart: { x: 0, y: -20 },
+      leftTarget: { x: 70, y: -20 },
+      rightRoot: { x: 20, y: 0 },
+      rightStart: { x: 20, y: -20 },
+      rightTarget: { x: 90, y: -20 },
+    }),
+    null,
   );
 });
 

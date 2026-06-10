@@ -19,6 +19,24 @@ export function getVisibleQuadrantHintEndpoints(input: {
   previewEndpointName: "leftHand" | "rightHand" | "leftFoot" | "rightFoot" | null;
 }): Array<"leftHand" | "rightHand" | "leftFoot" | "rightFoot">;
 
+export function isSkeletonPointActive(input: {
+  activeControlId: string | null | undefined;
+  activeQuadrantEndpointNames: Array<
+    "leftHand" | "rightHand" | "leftFoot" | "rightFoot"
+  >;
+  pointName: string;
+}): boolean;
+
+export function getTwoHandDynoCoreDelta(input: {
+  armMaxReach: number;
+  leftRoot: { x: number; y: number };
+  leftStart: { x: number; y: number };
+  leftTarget: { x: number; y: number };
+  rightRoot: { x: number; y: number };
+  rightStart: { x: number; y: number };
+  rightTarget: { x: number; y: number };
+}): { x: 0; y: number } | null;
+
 export function getTutorialDirectJointMarkerStyle(input: {
   jointActiveRadius: number;
 }): {

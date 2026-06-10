@@ -4,17 +4,20 @@ import Svg, { Circle, G, Line, Path } from "react-native-svg";
 
 import { getPoseHeadFacing } from "../lib/rupaCharacterRig";
 import { getSkeletonCharacterVisualProfile } from "../lib/skeletonCharacterVisualProfile";
+import { isSkeletonPointActive } from "../lib/skeletonPoseInteraction";
 import type { SkeletonCharacterVisualProfile } from "../lib/skeletonCharacterVisualProfile";
 import type { CharacterRigFacing } from "../types/characterRig";
 import type { Point2D } from "../types/geometry";
 import type {
   SkeletonBodyModel,
+  SkeletonEndpointName,
   SkeletonPointName,
   SkeletonPose,
 } from "../types/skeletonPose";
 
 export type MinimalSkeletonCharacterLayerProps = {
   activeControlId?: string | null;
+  activeQuadrantEndpointNames?: SkeletonEndpointName[];
   bodyModel: SkeletonBodyModel;
   opacity?: number;
   pose: SkeletonPose;
@@ -81,16 +84,35 @@ function getPointBetween(from: Point2D, to: Point2D, ratio: number): Point2D {
 
 function isBoneActive(
   activeControlId: string | null | undefined,
+  activeQuadrantEndpointNames: SkeletonEndpointName[],
   [from, to]: Bone,
 ) {
-  return activeControlId === from || activeControlId === to;
+  return (
+    isSkeletonPointActive({
+      activeControlId,
+      activeQuadrantEndpointNames,
+      pointName: from,
+    }) ||
+    isSkeletonPointActive({
+      activeControlId,
+      activeQuadrantEndpointNames,
+      pointName: to,
+    })
+  );
 }
 
 function isChainActive(
   activeControlId: string | null | undefined,
+  activeQuadrantEndpointNames: SkeletonEndpointName[],
   chain: readonly SkeletonPointName[],
 ) {
-  return activeControlId ? chain.includes(activeControlId as SkeletonPointName) : false;
+  return chain.some((pointName) =>
+    isSkeletonPointActive({
+      activeControlId,
+      activeQuadrantEndpointNames,
+      pointName,
+    }),
+  );
 }
 
 function getChainPath(pose: SkeletonPose, chain: readonly SkeletonPointName[]) {
@@ -214,6 +236,7 @@ function renderSideFace(
 
 export function MinimalSkeletonCharacterLayer({
   activeControlId = null,
+  activeQuadrantEndpointNames = [],
   bodyModel,
   opacity = 1,
   pose,
@@ -253,7 +276,11 @@ export function MinimalSkeletonCharacterLayer({
       <Svg height="100%" pointerEvents="none" width="100%">
         {metrics.useContinuousLimbPaths
           ? STICKMAN_CHAINS.map((chain) => {
-              const active = isChainActive(activeControlId, chain);
+              const active = isChainActive(
+                activeControlId,
+                activeQuadrantEndpointNames,
+                chain,
+              );
               const d = getChainPath(pose, chain);
 
               return (
@@ -285,7 +312,11 @@ export function MinimalSkeletonCharacterLayer({
             })
           : BODY_BONES.map((bone) => {
               const [from, to] = bone;
-              const active = isBoneActive(activeControlId, bone);
+              const active = isBoneActive(
+                activeControlId,
+                activeQuadrantEndpointNames,
+                bone,
+              );
 
               return (
                 <G key={`${from}-${to}`}>
@@ -338,7 +369,11 @@ export function MinimalSkeletonCharacterLayer({
 
         {JOINTS.map((jointName) => {
           const joint = pose.joints[jointName];
-          const active = activeControlId === jointName;
+          const active = isSkeletonPointActive({
+            activeControlId,
+            activeQuadrantEndpointNames,
+            pointName: jointName,
+          });
 
           if (!active && !metrics.showIdleJoints) {
             return null;

@@ -45,9 +45,11 @@ import {
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
   getTutorialDirectJointMarkerStyle,
+  getTwoHandDynoCoreDelta,
   getVisibleQuadrantHintEndpoints,
   isCoreDragStart,
   isQuadrantEndpointAllowed,
+  isSkeletonPointActive,
   shouldHandleQuadrantDrag,
   shouldAllowSkeletonPinchScale,
 } from "../lib/skeletonPoseInteraction";
@@ -757,6 +759,108 @@ export const SkeletonPoseOverlay = forwardRef<
     setActiveQuadrantEndpoints(getQuadrantEndpointNames(drags));
   }
 
+  function getQuadrantDragPoint(
+    drag: QuadrantTouchDrag,
+    touchesByIdentifier: Map<string, Point2D>,
+  ) {
+    const point = touchesByIdentifier.get(drag.identifier);
+
+    if (!point) {
+      return null;
+    }
+
+    return {
+      delta: {
+        x: point.x - drag.startPoint.x,
+        y: point.y - drag.startPoint.y,
+      },
+      point,
+    };
+  }
+
+  function getEndpointDragTarget(
+    startPose: SkeletonPose,
+    drag: QuadrantTouchDrag & {
+      target: { kind: "endpoint"; id: SkeletonEndpointName };
+    },
+    touchesByIdentifier: Map<string, Point2D>,
+  ) {
+    const dragPoint = getQuadrantDragPoint(drag, touchesByIdentifier);
+
+    if (!dragPoint) {
+      return null;
+    }
+
+    const endpointStart = getEndpointPosition(startPose, drag.target.id);
+
+    return {
+      x: endpointStart.x + dragPoint.delta.x,
+      y: endpointStart.y + dragPoint.delta.y,
+    };
+  }
+
+  function applyTwoHandDynoCoreLift(
+    startPose: SkeletonPose,
+    currentPose: SkeletonPose,
+    drags: QuadrantTouchDrag[],
+    touchesByIdentifier: Map<string, Point2D>,
+  ) {
+    const leftHandDrag = drags.find(
+      (
+        drag,
+      ): drag is QuadrantTouchDrag & {
+        target: { kind: "endpoint"; id: "leftHand" };
+      } => drag.target.kind === "endpoint" && drag.target.id === "leftHand",
+    );
+    const rightHandDrag = drags.find(
+      (
+        drag,
+      ): drag is QuadrantTouchDrag & {
+        target: { kind: "endpoint"; id: "rightHand" };
+      } => drag.target.kind === "endpoint" && drag.target.id === "rightHand",
+    );
+
+    if (!leftHandDrag || !rightHandDrag) {
+      return currentPose;
+    }
+
+    const leftTarget = getEndpointDragTarget(
+      startPose,
+      leftHandDrag,
+      touchesByIdentifier,
+    );
+    const rightTarget = getEndpointDragTarget(
+      startPose,
+      rightHandDrag,
+      touchesByIdentifier,
+    );
+
+    if (!leftTarget || !rightTarget) {
+      return currentPose;
+    }
+
+    const coreDelta = getTwoHandDynoCoreDelta({
+      armMaxReach: bodyModelRef.current.upperArm + bodyModelRef.current.forearm,
+      leftRoot: startPose.joints.leftShoulder,
+      leftStart: startPose.joints.leftHand,
+      leftTarget,
+      rightRoot: startPose.joints.rightShoulder,
+      rightStart: startPose.joints.rightHand,
+      rightTarget,
+    });
+
+    if (!coreDelta) {
+      return currentPose;
+    }
+
+    return resolveSkeletonBodyDrag(
+      currentPose,
+      { delta: coreDelta },
+      bodyModelRef.current,
+      modeRef.current,
+    );
+  }
+
   function syncQuadrantTouchDrags(event: GestureResponderEvent) {
     const activeIdentifiers = new Set(
       event.nativeEvent.touches.map(getTouchIdentifier),
@@ -838,40 +942,49 @@ export const SkeletonPoseOverlay = forwardRef<
       MIN_DRAG_FRAME_DISTANCE,
       MAX_DRAG_FRAME_DISTANCE * scaleRef.current,
     );
-    let nextPose = startPose;
+    let nextPose = applyTwoHandDynoCoreLift(
+      startPose,
+      startPose,
+      drags,
+      touchesByIdentifier,
+    );
 
     drags.forEach((drag) => {
-      const point = touchesByIdentifier.get(drag.identifier);
+      const dragPoint = getQuadrantDragPoint(drag, touchesByIdentifier);
 
-      if (!point) {
+      if (!dragPoint) {
         return;
       }
-
-      const delta = {
-        x: point.x - drag.startPoint.x,
-        y: point.y - drag.startPoint.y,
-      };
 
       if (drag.target.kind === "body") {
         nextPose = resolveSkeletonBodyDrag(
           nextPose,
-          { delta },
+          { delta: dragPoint.delta },
           bodyModelRef.current,
           modeRef.current,
         );
         return;
       }
 
-      const endpointStart = getEndpointPosition(startPose, drag.target.id);
+      const endpointDrag = drag as QuadrantTouchDrag & {
+        target: { kind: "endpoint"; id: SkeletonEndpointName };
+      };
+      const target = getEndpointDragTarget(
+        startPose,
+        endpointDrag,
+        touchesByIdentifier,
+      );
+
+      if (!target) {
+        return;
+      }
+
       const resolution = resolveSkeletonPoseDragWithMode(
         nextPose,
         {
-          endpointName: drag.target.id,
+          endpointName: endpointDrag.target.id,
           previousMode: drag.mode,
-          target: {
-            x: endpointStart.x + delta.x,
-            y: endpointStart.y + delta.y,
-          },
+          target,
         },
         bodyModelRef.current,
       );
@@ -1492,6 +1605,7 @@ export const SkeletonPoseOverlay = forwardRef<
       {shouldRenderVectorCharacter ? (
         <MinimalSkeletonCharacterLayer
           activeControlId={activeControlId}
+          activeQuadrantEndpointNames={activeQuadrantEndpoints}
           bodyModel={bodyModel}
           opacity={characterOpacity.character}
           pose={pose}
@@ -1603,7 +1717,11 @@ export const SkeletonPoseOverlay = forwardRef<
 
           {ENDPOINTS.map((endpointName) => {
             const point = pose.joints[endpointName];
-            const isActive = endpointName === activeControlId;
+            const isActive = isSkeletonPointActive({
+              activeControlId,
+              activeQuadrantEndpointNames: activeQuadrantEndpoints,
+              pointName: endpointName,
+            });
 
             return (
               <Circle

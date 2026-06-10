@@ -48,6 +48,54 @@ export function getVisibleQuadrantHintEndpoints({
   return endpointNames;
 }
 
+export function isSkeletonPointActive({
+  activeControlId,
+  activeQuadrantEndpointNames,
+  pointName,
+}) {
+  return (
+    pointName === activeControlId ||
+    activeQuadrantEndpointNames.includes(pointName)
+  );
+}
+
+function pointDistance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+export function getTwoHandDynoCoreDelta({
+  armMaxReach,
+  leftRoot,
+  leftStart,
+  leftTarget,
+  rightRoot,
+  rightStart,
+  rightTarget,
+}) {
+  const averageDragY =
+    (leftTarget.y - leftStart.y + rightTarget.y - rightStart.y) / 2;
+
+  if (averageDragY >= 0) {
+    return null;
+  }
+
+  const leftOverflow = Math.max(
+    0,
+    pointDistance(leftRoot, leftTarget) - armMaxReach,
+  );
+  const rightOverflow = Math.max(
+    0,
+    pointDistance(rightRoot, rightTarget) - armMaxReach,
+  );
+  const averageOverflow = (leftOverflow + rightOverflow) / 2;
+
+  if (averageOverflow <= 0) {
+    return null;
+  }
+
+  return { x: 0, y: -averageOverflow };
+}
+
 export function getTutorialDirectJointMarkerStyle({ jointActiveRadius }) {
   return {
     fill: "transparent",
