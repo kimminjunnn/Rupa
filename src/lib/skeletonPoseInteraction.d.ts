@@ -7,6 +7,15 @@ export function getSkeletonOverlayPointerEvents(
   allowEmptySpacePinchScale: boolean,
 ): "auto" | "box-none";
 
+export function getTutorialDirectJointMarkerStyle(input: {
+  jointActiveRadius: number;
+}): {
+  fill: "transparent";
+  radius: number;
+  stroke: "rgba(254,214,96,0.78)";
+  strokeWidth: 1.75;
+};
+
 export function getQuadrantEndpointName(input: {
   width: number;
   height: number;

@@ -9,6 +9,15 @@ export function getSkeletonOverlayPointerEvents(allowEmptySpacePinchScale) {
   return allowEmptySpacePinchScale ? "auto" : "box-none";
 }
 
+export function getTutorialDirectJointMarkerStyle({ jointActiveRadius }) {
+  return {
+    fill: "transparent",
+    radius: jointActiveRadius + 1,
+    stroke: "rgba(254,214,96,0.78)",
+    strokeWidth: 1.75,
+  };
+}
+
 export function getQuadrantEndpointName({ width, height, x, y }) {
   const isLeft = x < width / 2;
   const isTop = y < height / 2;

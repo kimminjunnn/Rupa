@@ -4,6 +4,7 @@ const test = require("node:test");
 const {
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
+  getTutorialDirectJointMarkerStyle,
   isQuadrantEndpointAllowed,
   isCoreDragStart,
   shouldAllowSkeletonPinchScale,
@@ -111,4 +112,19 @@ test("supports a custom core drag radius", () => {
     isCoreDragStart({ ...viewport, x: 231, y: 400, radius: 30 }),
     false,
   );
+});
+
+test("renders direct joint tutorial markers as small thin rings", () => {
+  const markerStyle = getTutorialDirectJointMarkerStyle({
+    jointActiveRadius: 10.5,
+  });
+
+  assert.deepEqual(markerStyle, {
+    fill: "transparent",
+    radius: 11.5,
+    stroke: "rgba(254,214,96,0.78)",
+    strokeWidth: 1.75,
+  });
+  assert.ok(markerStyle.radius < 10.5 + 3);
+  assert.ok(markerStyle.strokeWidth < 3);
 });

@@ -44,6 +44,7 @@ import {
 import {
   getQuadrantEndpointName,
   getSkeletonOverlayPointerEvents,
+  getTutorialDirectJointMarkerStyle,
   isCoreDragStart,
   isQuadrantEndpointAllowed,
   shouldAllowSkeletonPinchScale,
@@ -1254,6 +1255,9 @@ export const SkeletonPoseOverlay = forwardRef<
   );
 
   const isDirectJointTutorial = tutorialDirectJointGroup !== null;
+  const tutorialDirectJointMarkerStyle = getTutorialDirectJointMarkerStyle({
+    jointActiveRadius: metrics.jointActiveRadius,
+  });
   const shouldShowBodyHitArea =
     interactive && !tutorialDisableDirectHandles && !isDirectJointTutorial;
   const shouldShowEndpointHitAreas =
@@ -1448,10 +1452,10 @@ export const SkeletonPoseOverlay = forwardRef<
               <Circle
                 cx={pose.joints.neck.x}
                 cy={pose.joints.neck.y}
-                fill="#ffb37a"
-                r={metrics.jointActiveRadius + 3}
-                stroke="rgba(254,214,96,0.92)"
-                strokeWidth={3}
+                fill={tutorialDirectJointMarkerStyle.fill}
+                r={tutorialDirectJointMarkerStyle.radius}
+                stroke={tutorialDirectJointMarkerStyle.stroke}
+                strokeWidth={tutorialDirectJointMarkerStyle.strokeWidth}
               />
             ) : null}
             {CONTROL_JOINTS.filter(isJointInTutorialGroup).map((jointName) => (
@@ -1459,10 +1463,10 @@ export const SkeletonPoseOverlay = forwardRef<
                 key={jointName}
                 cx={pose.joints[jointName].x}
                 cy={pose.joints[jointName].y}
-                fill="#ffb37a"
-                r={metrics.jointActiveRadius + 3}
-                stroke="rgba(254,214,96,0.92)"
-                strokeWidth={3}
+                fill={tutorialDirectJointMarkerStyle.fill}
+                r={tutorialDirectJointMarkerStyle.radius}
+                stroke={tutorialDirectJointMarkerStyle.stroke}
+                strokeWidth={tutorialDirectJointMarkerStyle.strokeWidth}
               />
             ))}
           </Svg>
