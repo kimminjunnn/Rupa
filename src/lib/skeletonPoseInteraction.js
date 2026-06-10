@@ -1,12 +1,29 @@
 export function shouldAllowSkeletonPinchScale(
   mode,
   allowPinchScaleInSimulation,
+  simulationInputMode = "handles",
 ) {
-  return mode === "calibrating" || allowPinchScaleInSimulation;
+  if (mode === "calibrating") {
+    return true;
+  }
+
+  return allowPinchScaleInSimulation && simulationInputMode !== "quadrants";
 }
 
 export function getSkeletonOverlayPointerEvents(allowEmptySpacePinchScale) {
   return allowEmptySpacePinchScale ? "auto" : "box-none";
+}
+
+export function shouldHandleQuadrantDrag({
+  mode,
+  simulationInputMode,
+  touchCount,
+}) {
+  return (
+    mode === "simulating" &&
+    simulationInputMode === "quadrants" &&
+    touchCount > 0
+  );
 }
 
 export function getTutorialDirectJointMarkerStyle({ jointActiveRadius }) {

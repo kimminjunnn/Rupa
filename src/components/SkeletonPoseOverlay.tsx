@@ -47,6 +47,7 @@ import {
   getTutorialDirectJointMarkerStyle,
   isCoreDragStart,
   isQuadrantEndpointAllowed,
+  shouldHandleQuadrantDrag,
   shouldAllowSkeletonPinchScale,
 } from "../lib/skeletonPoseInteraction";
 import {
@@ -187,6 +188,17 @@ type SkeletonDragTarget =
   | { kind: "head" }
   | { kind: "body" };
 
+type QuadrantDragTarget =
+  | { kind: "endpoint"; id: SkeletonEndpointName }
+  | { kind: "body" };
+
+type QuadrantTouchDrag = {
+  identifier: string;
+  mode: SkeletonDragResolutionMode | null;
+  startPoint: Point2D;
+  target: QuadrantDragTarget;
+};
+
 type HitFrame = {
   left: number;
   top: number;
@@ -290,6 +302,21 @@ function getPinchDistance(event: GestureResponderEvent) {
     firstTouch.pageX - secondTouch.pageX,
     firstTouch.pageY - secondTouch.pageY,
   );
+}
+
+function getTouchPoint(
+  touch: GestureResponderEvent["nativeEvent"]["touches"][number],
+): Point2D {
+  return {
+    x: touch.locationX,
+    y: touch.locationY,
+  };
+}
+
+function getTouchIdentifier(
+  touch: GestureResponderEvent["nativeEvent"]["touches"][number],
+) {
+  return touch.identifier;
 }
 
 function createDefaultPose(
@@ -437,8 +464,10 @@ export const SkeletonPoseOverlay = forwardRef<
   const profileRef = useRef(profile);
   const poseRef = useRef(pose);
   const scaleRef = useRef(scale);
+  const simulationInputModeRef = useRef(simulationInputMode);
   const pinchStartDistanceRef = useRef<number | null>(null);
   const pinchStartScaleRef = useRef(scale);
+  const quadrantTouchDragsRef = useRef<QuadrantTouchDrag[]>([]);
   const hitFramesRef = useRef<Record<string, HitFrame>>({});
   const tutorialDirectJointGroupRef = useRef(tutorialDirectJointGroup);
   const onTutorialHandleStartRef = useRef(onTutorialHandleStart);
@@ -459,6 +488,10 @@ export const SkeletonPoseOverlay = forwardRef<
   useEffect(() => {
     modeRef.current = mode;
   }, [mode]);
+
+  useEffect(() => {
+    simulationInputModeRef.current = simulationInputMode;
+  }, [simulationInputMode]);
 
   useEffect(() => {
     profileRef.current = profile;
@@ -651,16 +684,223 @@ export const SkeletonPoseOverlay = forwardRef<
     onTutorialHandleStartRef.current?.(target);
   }
 
-  function beginQuadrantEndpointDrag(point: Point2D) {
-    const endpointName = getQuadrantEndpointName({
+  function getQuadrantDragTarget(point: Point2D): QuadrantDragTarget | null {
+    const isCore = isCoreDragStart({
       height: viewportHeight,
+      radius: QUADRANT_CORE_HANDLE_RADIUS,
       width: viewportWidth,
       x: point.x,
       y: point.y,
     });
 
-    beginEndpointDrag(endpointName);
-    setActiveQuadrantEndpoint(endpointName);
+    if (tutorialBodyOnly) {
+      return isCore ? { kind: "body" } : null;
+    }
+
+    if (tutorialQuadrantEndpoint !== null) {
+      if (isCore) {
+        return null;
+      }
+
+      const endpointName = getQuadrantEndpointName({
+        height: viewportHeight,
+        width: viewportWidth,
+        x: point.x,
+        y: point.y,
+      });
+
+      return isQuadrantEndpointAllowed({
+        allowedEndpointName: tutorialQuadrantEndpoint,
+        endpointName,
+      })
+        ? { kind: "endpoint", id: endpointName }
+        : null;
+    }
+
+    if (isCore) {
+      return { kind: "body" };
+    }
+
+    return {
+      kind: "endpoint",
+      id: getQuadrantEndpointName({
+        height: viewportHeight,
+        width: viewportWidth,
+        x: point.x,
+        y: point.y,
+      }),
+    };
+  }
+
+  function getQuadrantTargetKey(target: QuadrantDragTarget) {
+    return target.kind === "body" ? "body" : target.id;
+  }
+
+  function syncQuadrantTouchDrags(event: GestureResponderEvent) {
+    const activeIdentifiers = new Set(
+      event.nativeEvent.touches.map(getTouchIdentifier),
+    );
+    const drags = quadrantTouchDragsRef.current.filter((drag) =>
+      activeIdentifiers.has(drag.identifier),
+    );
+    const usedTargetKeys = new Set(
+      drags.map((drag) => getQuadrantTargetKey(drag.target)),
+    );
+
+    event.nativeEvent.touches.forEach((touch) => {
+      const identifier = getTouchIdentifier(touch);
+
+      if (drags.some((drag) => drag.identifier === identifier)) {
+        return;
+      }
+
+      const point = getTouchPoint(touch);
+      const target = getQuadrantDragTarget(point);
+
+      if (!target) {
+        return;
+      }
+
+      const targetKey = getQuadrantTargetKey(target);
+
+      if (usedTargetKeys.has(targetKey)) {
+        return;
+      }
+
+      usedTargetKeys.add(targetKey);
+      drags.push({
+        identifier,
+        mode: null,
+        startPoint: point,
+        target,
+      });
+
+      onTutorialQuadrantStart?.(
+        target.kind === "body" ? "body" : target.id,
+      );
+    });
+
+    quadrantTouchDragsRef.current = drags;
+    return drags;
+  }
+
+  function beginQuadrantTouchDrags(event: GestureResponderEvent) {
+    quadrantTouchDragsRef.current = [];
+    activeDragModeRef.current = null;
+    dragStartPointRef.current = null;
+    dragStartPoseRef.current = poseRef.current;
+    dragStartSnapshotRef.current = getCurrentSnapshot();
+
+    const drags = syncQuadrantTouchDrags(event);
+    const firstTarget = drags[0]?.target ?? null;
+    const endpointDrags = drags.filter(
+      (drag) => drag.target.kind === "endpoint",
+    );
+
+    setIsQuadrantCoreActive(
+      drags.some((drag) => drag.target.kind === "body"),
+    );
+    setActiveQuadrantEndpoint(
+      endpointDrags.length === 1 && endpointDrags[0].target.kind === "endpoint"
+        ? endpointDrags[0].target.id
+        : null,
+    );
+    setActiveDragTarget(firstTarget);
+  }
+
+  function moveQuadrantTouchDrags(event: GestureResponderEvent) {
+    const startPose = dragStartPoseRef.current;
+    const drags = syncQuadrantTouchDrags(event);
+
+    if (!startPose || drags.length === 0) {
+      return;
+    }
+
+    const touchesByIdentifier = new Map(
+      event.nativeEvent.touches.map((touch) => [
+        getTouchIdentifier(touch),
+        getTouchPoint(touch),
+      ]),
+    );
+    const maxDragFrameDistance = Math.max(
+      MIN_DRAG_FRAME_DISTANCE,
+      MAX_DRAG_FRAME_DISTANCE * scaleRef.current,
+    );
+    let nextPose = startPose;
+
+    drags.forEach((drag) => {
+      const point = touchesByIdentifier.get(drag.identifier);
+
+      if (!point) {
+        return;
+      }
+
+      const delta = {
+        x: point.x - drag.startPoint.x,
+        y: point.y - drag.startPoint.y,
+      };
+
+      if (drag.target.kind === "body") {
+        nextPose = resolveSkeletonBodyDrag(
+          nextPose,
+          { delta },
+          bodyModelRef.current,
+          modeRef.current,
+        );
+        return;
+      }
+
+      const endpointStart = getEndpointPosition(startPose, drag.target.id);
+      const resolution = resolveSkeletonPoseDragWithMode(
+        nextPose,
+        {
+          endpointName: drag.target.id,
+          previousMode: drag.mode,
+          target: {
+            x: endpointStart.x + delta.x,
+            y: endpointStart.y + delta.y,
+          },
+        },
+        bodyModelRef.current,
+      );
+
+      drag.mode = resolution.mode;
+      nextPose = resolution.pose;
+    });
+
+    const limitedPose = limitSkeletonPoseStepWithModel(
+      poseRef.current,
+      nextPose,
+      maxDragFrameDistance,
+      bodyModelRef.current,
+    );
+
+    poseRef.current = limitedPose;
+    setPose(limitedPose);
+  }
+
+  function endQuadrantTouchDrags() {
+    const endedDrags = quadrantTouchDragsRef.current;
+    const endedTarget =
+      endedDrags.length === 1
+        ? endedDrags[0].target.kind === "body"
+          ? ({ kind: "body" } as SkeletonDragTarget)
+          : ({
+              kind: "endpoint",
+              id: endedDrags[0].target.id,
+            } as SkeletonDragTarget)
+        : null;
+
+    commitPoseHistory(dragStartSnapshotRef.current);
+    quadrantTouchDragsRef.current = [];
+    activeDragModeRef.current = null;
+    dragStartPointRef.current = null;
+    dragStartPoseRef.current = null;
+    dragStartSnapshotRef.current = null;
+    setActiveQuadrantEndpoint(null);
+    setIsQuadrantCoreActive(false);
+    setActiveDragTarget(null);
+    onTutorialDragEndRef.current?.(endedTarget);
   }
 
   function beginJointDrag(jointName: SkeletonControlJointName) {
@@ -707,78 +947,6 @@ export const SkeletonPoseOverlay = forwardRef<
     dragStartSnapshotRef.current = getCurrentSnapshot();
     setActiveDragTarget(target);
     onTutorialHandleStartRef.current?.(target);
-  }
-
-  function beginQuadrantDrag(point: Point2D) {
-    if (tutorialBodyOnly) {
-      if (
-        !isCoreDragStart({
-          height: viewportHeight,
-          radius: QUADRANT_CORE_HANDLE_RADIUS,
-          width: viewportWidth,
-          x: point.x,
-          y: point.y,
-        })
-      ) {
-        return;
-      }
-
-      onTutorialQuadrantStart?.("body");
-      beginBodyDrag();
-      setIsQuadrantCoreActive(true);
-      return;
-    }
-
-    if (tutorialQuadrantEndpoint !== null) {
-      if (
-        isCoreDragStart({
-          height: viewportHeight,
-          radius: QUADRANT_CORE_HANDLE_RADIUS,
-          width: viewportWidth,
-          x: point.x,
-          y: point.y,
-        })
-      ) {
-        return;
-      }
-
-      const endpointName = getQuadrantEndpointName({
-        height: viewportHeight,
-        width: viewportWidth,
-        x: point.x,
-        y: point.y,
-      });
-
-      if (
-        !isQuadrantEndpointAllowed({
-          allowedEndpointName: tutorialQuadrantEndpoint,
-          endpointName,
-        })
-      ) {
-        return;
-      }
-
-      onTutorialQuadrantStart?.(endpointName);
-      beginEndpointDrag(endpointName);
-      setActiveQuadrantEndpoint(endpointName);
-      return;
-    }
-
-    if (
-      isCoreDragStart({
-        height: viewportHeight,
-        radius: QUADRANT_CORE_HANDLE_RADIUS,
-        width: viewportWidth,
-        x: point.x,
-        y: point.y,
-      })
-    ) {
-      beginBodyDrag();
-      setIsQuadrantCoreActive(true);
-      return;
-    }
-
-    beginQuadrantEndpointDrag(point);
   }
 
   function scaleSkeletonTo(nextScale: number) {
@@ -1049,6 +1217,7 @@ export const SkeletonPoseOverlay = forwardRef<
       !shouldAllowSkeletonPinchScale(
         modeRef.current,
         allowPinchScaleInSimulation,
+        simulationInputModeRef.current,
       ) ||
       distance === null
     ) {
@@ -1072,6 +1241,7 @@ export const SkeletonPoseOverlay = forwardRef<
       !shouldAllowSkeletonPinchScale(
         modeRef.current,
         allowPinchScaleInSimulation,
+        simulationInputModeRef.current,
       ) ||
       distance === null ||
       startDistance === null ||
@@ -1095,6 +1265,7 @@ export const SkeletonPoseOverlay = forwardRef<
       shouldAllowSkeletonPinchScale(
         modeRef.current,
         allowPinchScaleInSimulation,
+        simulationInputModeRef.current,
       ) && event.nativeEvent.touches.length >= 2
     );
   }
@@ -1212,24 +1383,25 @@ export const SkeletonPoseOverlay = forwardRef<
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: (event) =>
-          modeRef.current === "simulating" &&
-          simulationInputMode === "quadrants" &&
-          event.nativeEvent.touches.length < 2,
+          shouldHandleQuadrantDrag({
+            mode: modeRef.current,
+            simulationInputMode,
+            touchCount: event.nativeEvent.touches.length,
+          }),
         onMoveShouldSetPanResponder: (event) =>
-          modeRef.current === "simulating" &&
-          simulationInputMode === "quadrants" &&
-          event.nativeEvent.touches.length < 2,
+          shouldHandleQuadrantDrag({
+            mode: modeRef.current,
+            simulationInputMode,
+            touchCount: event.nativeEvent.touches.length,
+          }),
         onPanResponderGrant: (event) => {
-          beginQuadrantDrag({
-            x: event.nativeEvent.locationX,
-            y: event.nativeEvent.locationY,
-          });
+          beginQuadrantTouchDrags(event);
         },
-        onPanResponderMove: (_event, gestureState) => {
-          moveActiveDrag(gestureState);
+        onPanResponderMove: (event) => {
+          moveQuadrantTouchDrags(event);
         },
-        onPanResponderRelease: endEndpointDrag,
-        onPanResponderTerminate: endEndpointDrag,
+        onPanResponderRelease: endQuadrantTouchDrags,
+        onPanResponderTerminate: endQuadrantTouchDrags,
       }),
     [
       onTutorialQuadrantStart,

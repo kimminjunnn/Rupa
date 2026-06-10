@@ -7,18 +7,54 @@ const {
   getTutorialDirectJointMarkerStyle,
   isQuadrantEndpointAllowed,
   isCoreDragStart,
+  shouldHandleQuadrantDrag,
   shouldAllowSkeletonPinchScale,
 } = require("./skeletonPoseInteraction.js");
 
-test("allows skeleton pinch scale in simulation only when explicitly enabled", () => {
+test("allows skeleton pinch scale in simulation only for direct handle mode", () => {
   assert.equal(shouldAllowSkeletonPinchScale("calibrating", false), true);
   assert.equal(shouldAllowSkeletonPinchScale("simulating", false), false);
   assert.equal(shouldAllowSkeletonPinchScale("simulating", true), true);
+  assert.equal(
+    shouldAllowSkeletonPinchScale("simulating", true, "handles"),
+    true,
+  );
+  assert.equal(
+    shouldAllowSkeletonPinchScale("simulating", true, "quadrants"),
+    false,
+  );
 });
 
 test("uses a touchable overlay when empty-space pinch scaling is enabled", () => {
   assert.equal(getSkeletonOverlayPointerEvents(false), "box-none");
   assert.equal(getSkeletonOverlayPointerEvents(true), "auto");
+});
+
+test("lets quadrant controls handle multi-touch limb dragging", () => {
+  assert.equal(
+    shouldHandleQuadrantDrag({
+      mode: "simulating",
+      simulationInputMode: "quadrants",
+      touchCount: 2,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldHandleQuadrantDrag({
+      mode: "simulating",
+      simulationInputMode: "handles",
+      touchCount: 2,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldHandleQuadrantDrag({
+      mode: "calibrating",
+      simulationInputMode: "quadrants",
+      touchCount: 2,
+    }),
+    false,
+  );
 });
 
 test("selects limb endpoints from screen quadrants", () => {

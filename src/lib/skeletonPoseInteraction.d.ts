@@ -1,11 +1,18 @@
 export function shouldAllowSkeletonPinchScale(
   mode: "calibrating" | "simulating",
   allowPinchScaleInSimulation: boolean,
+  simulationInputMode?: "quadrants" | "handles",
 ): boolean;
 
 export function getSkeletonOverlayPointerEvents(
   allowEmptySpacePinchScale: boolean,
 ): "auto" | "box-none";
+
+export function shouldHandleQuadrantDrag(input: {
+  mode: "calibrating" | "simulating";
+  simulationInputMode: "quadrants" | "handles";
+  touchCount: number;
+}): boolean;
 
 export function getTutorialDirectJointMarkerStyle(input: {
   jointActiveRadius: number;
