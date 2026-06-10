@@ -5,7 +5,10 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import * as SystemUI from "expo-system-ui";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+} from "react-native-safe-area-context";
 
 import { brand } from "../src/theme/brand";
 
@@ -16,7 +19,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <StatusBar backgroundColor={brand.colors.chrome} style="dark" />
         <Stack
           screenOptions={{

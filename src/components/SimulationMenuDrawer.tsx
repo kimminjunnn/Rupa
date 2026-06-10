@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useMemo } from "react";
 import { Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { getSimulationMenuDrawerPadding } from "../lib/simulationMenuDrawerLayout";
 import { brand } from "../theme/brand";
 
 type SimulationMenuDrawerProps = {
@@ -21,6 +23,11 @@ export function SimulationMenuDrawer({
   onClose,
 }: SimulationMenuDrawerProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const drawerPadding = useMemo(
+    () => getSimulationMenuDrawerPadding(insets),
+    [insets],
+  );
   const actions: DrawerAction[] = [
     {
       icon: "home-outline",
@@ -55,8 +62,8 @@ export function SimulationMenuDrawer({
           style={styles.backdrop}
         />
 
-        <SafeAreaView edges={["top", "bottom"]} style={styles.drawerSafeArea}>
-          <View style={styles.drawer}>
+        <View style={styles.drawerSafeArea}>
+          <View style={[styles.drawer, drawerPadding]}>
             <View style={styles.header}>
               <Image
                 accessibilityLabel="Rupa"
@@ -101,7 +108,7 @@ export function SimulationMenuDrawer({
               ))}
             </View>
           </View>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
@@ -125,7 +132,6 @@ const styles = StyleSheet.create({
   drawer: {
     flex: 1,
     paddingHorizontal: 18,
-    paddingVertical: 18,
     borderLeftWidth: 1,
     borderLeftColor: "rgba(37,29,21,0.14)",
     backgroundColor: brand.colors.wall,
